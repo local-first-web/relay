@@ -1,0 +1,58 @@
+{
+  "name": "@localfirst/relay",
+  "version": "0.1.8",
+  "license": "MIT",
+  "private": true,
+  "scripts": {
+    "build": "lerna run build",
+    "build:quick": "tsc -b packages/relay",
+    "start:signal-server": "yarn workspace relay start",
+    "dev": "run-p watch test:watch",
+    "dev:log": "run-p watch test:log",
+    "dev:signal-server": "yarn workspace relay dev",
+    "lint": "lerna run lint",
+    "publish": "lerna publish --yes",
+    "watch": "run-p watch:build:quick",
+    "watch:build:quick": "yarn build:quick --watch",
+    "test": "jest",
+    "test:log": "cross-env DEBUG='localfirst*' DEBUG_COLORS=1 yarn test",
+    "test:watch": "jest --watch",
+    "purge": "scripts/purge.bat"
+  },
+  "dependencies": {
+    "esm": "3"
+  },
+  "devDependencies": {
+    "@types/jest": "25",
+    "cross-env": "6",
+    "jest": "25",
+    "lerna": "3",
+    "npm-run-all": "4",
+    "ts-jest": "25"
+  },
+  "engines": {
+    "yarn": ">=1.17.0"
+  },
+  "workspaces": {
+    "packages": [
+      "packages/*"
+    ],
+    "nohoist": [
+      "**/jest/**",
+      "**/jest"
+    ]
+  },
+  "prettier": {
+    "printWidth": 100,
+    "arrowParens": "avoid",
+    "semi": false,
+    "singleQuote": true,
+    "trailingComma": "es5"
+  },
+  "jest": {
+    "projects": [
+      "<rootDir>/packages/relay-client",
+      "<rootDir>/packages/relay"
+    ]
+  }
+}
