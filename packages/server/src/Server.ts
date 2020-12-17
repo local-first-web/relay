@@ -63,7 +63,7 @@ export class Server extends EventEmitter {
 
   constructor({ port = 8080 } = {}) {
     super()
-    this.log = debug(`cevitxe:signal-server${port}`)
+    this.log = debug(`lf:relay${port}`)
     this.port = port
     this.peers = {}
     this.keys = {}

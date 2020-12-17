@@ -4,7 +4,7 @@ import { EventEmitter } from 'events'
 
 import { ConnectionEvent } from '@localfirst/relay'
 
-const log = Debug('cevitxe:signal-client:peer')
+const log = Debug('lf:relay-client:peer')
 const { OPEN, CLOSE } = ConnectionEvent
 
 /**

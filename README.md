@@ -1,4 +1,4 @@
-# 🐟 relay
+<img src='https://raw.githubusercontent.com/local-first-web/branding/main/svg/relay-localfirst-icon-name-box.svg' height='100' />
 
 This server provides two services:
 
@@ -9,7 +9,7 @@ This server provides two services:
 - **Connection**: Client A can request to connect with Client B on a given document ID. If we get
   matching connection requests from A and B, we just pipe their sockets together.
 
-![diagram](../../images/signal-server.svg)
+![diagram](./images/local-first-relay.png)
 
 ## Running locally
 
@@ -31,24 +31,23 @@ $ node dist/start.js
 
 You can visit that URL with a web browser to confirm that it's working; you should see a big ol' fish emoji:
 
-<img src='https://github.com/DevResults/relay-standalone/raw/abe3b12a77d1880936b5c002266c350091f3eec1/relay-screenshot.png' width='300' />
+<img src='./images/screenshot.png' width='300' />
 
 ## Deployment
 
-The easiest way to stand one of these up is to use the [relay-standalone] repo,
-which is optimized for deployment. In that repo you'll find instructions for deploying to Heroku,
-AWS Elastic Beanstalk, Google Cloud Platform, and Glitch.
+The easiest way to stand one of these up is to use the [relay-standalone] repo, which is optimized
+for deployment. In that repo you'll find instructions for deploying to Heroku, AWS Elastic
+Beanstalk, Google Cloud Platform, and Glitch.
 
 ## Usage
 
-The client that we've written for this server is the easiest way to use it. See the instructions for
-[relay-client] for details.
+The [client] that we've written for this server is the easiest way to interact with it.
 
 ## API
 
-The following documentation might be of interest to anyone working on `relay-client`, or
-replacing it with a new client. You don't need to know any of this to interact with this server if
-you're using the client.
+> The following documentation might be of interest to anyone working on the client, or replacing it
+> with a new client. You don't need to know any of this to interact with this server if you're using
+> the client.
 
 This server has two WebSocket endpoints: `introduction` and `connection`.
 
@@ -105,6 +104,6 @@ MIT
 
 Inspired by https://github.com/orionz/discovery-cloud-server
 
-[relay-client]: https://github.com/devresults/cevitxe/blob/master/packages/relay-client/README.md
-[relay-standalone]: https://github.com/DevResults/relay-standalone
-[server tests]: https://github.com/DevResults/cevitxe/blob/master/packages/relay/src/Server.test.ts
+[client]: ./packages/relay-client/README.md
+[relay-standalone]: https://github.com/local-first-web/relay-deployable
+[server tests]: ./packages/relay/src/Server.test.ts

@@ -7,7 +7,7 @@ import { Peer } from './Peer'
 const { PEER } = ConnectionEvent
 
 describe('Client', () => {
-  const log = debug('cevitxe:signal-client:tests')
+  const log = debug('lf:relay-client:tests')
   let port: number
   let url: string
 

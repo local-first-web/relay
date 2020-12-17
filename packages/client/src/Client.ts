@@ -56,7 +56,7 @@ export class Client extends EventEmitter {
    */
   constructor({ id = newid(), url }: ClientOptions) {
     super()
-    this.log = debug(`cevitxe:signal-client:${id}`)
+    this.log = debug(`lf:relay-client:${id}`)
 
     this.id = id
     this.url = url

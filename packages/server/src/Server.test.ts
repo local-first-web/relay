@@ -4,7 +4,7 @@ import { Server } from './Server'
 import { getPortPromise as getAvailablePort } from 'portfinder'
 import { ConnectionEvent } from './types'
 
-const log = debug('cevitxe:signal-server:tests')
+const log = debug('lf:relay:tests')
 const { MESSAGE, OPEN } = ConnectionEvent
 
 describe('Server', () => {
