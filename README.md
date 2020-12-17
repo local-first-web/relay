@@ -4,6 +4,14 @@ width='250' alt="@localfirst/relay logo"/>
 `@localfirst/relay` is a tiny service that helps local-first applications connect with peers on
 other devices. It can run in the cloud or on any device with a known address.
 
+Deploy to:
+[Glitch](http://github.com/local-first-web/relay-deployable#deploying-to-glitch) |
+[Heroku](http://github.com/local-first-web/relay-deployable#deploying-to-heroku) |
+[AWS](http://github.com/local-first-web/relay-deployable#deploying-to-aws-elastic-beanstalk) |
+[Google](http://github.com/local-first-web/relay-deployable#deploying-to-google-cloud) |
+[Azure](http://github.com/local-first-web/relay-deployable#deploying-to-azure) |
+[local deployment](http://github.com/local-first-web/relay-deployable#installing-and-running-locally)
+
 ## Why
 
 <img src='./images/relay-1.png' height='200' align='center' ></img>
