@@ -1,4 +1,4 @@
-<img src='https://raw.githubusercontent.com/local-first-web/branding/main/svg/relay-localfirst-icon-name-box.svg' height='100' />
+<img src='https://raw.githubusercontent.com/local-first-web/branding/main/svg/relay-v.svg' width='250' alt="@localfirst/relay logo"/>
 
 This server provides two services:
 
@@ -16,15 +16,14 @@ This server provides two services:
 From this monorepo, you can run this server as follows:
 
 ```bash
-$ yarn start:signal-server
+$ yarn start
 ```
 
 You should see something like thsi:
 
 ```bash
-$ yarn start:signal-server
-yarn run v1.19.0
-$ yarn workspace relay start
+yarn run v1.22.4
+$ yarn workspace @localfirst/relay start
 $ node dist/start.js
 🐟 Listening at http://localhost:8080
 ```
@@ -35,13 +34,39 @@ You can visit that URL with a web browser to confirm that it's working; you shou
 
 ## Deployment
 
-The easiest way to stand one of these up is to use the [relay-standalone] repo, which is optimized
-for deployment. In that repo you'll find instructions for deploying to Heroku, AWS Elastic
+The easiest way to stand one of these up is to use the [@localfirst/relay-standalone] repo, which is
+optimized for deployment. In that repo you'll find instructions for deploying to Heroku, AWS Elastic
 Beanstalk, Google Cloud Platform, and Glitch.
 
 ## Usage
 
-The [client] that we've written for this server is the easiest way to interact with it.
+[@localfirst/relay-client], included in this repo, is a simple discovery cloud client library
+designed to be used with this server.
+
+You don't strictly need to use this client - you could interact directly with the server the way we
+do in the [server tests] - but it automates the business of accepting invitations when they're
+received.
+
+The client keeps track of all peers that the server connects you to, and for each peer it keeps
+track of each key (aka discoveryKey, aka channel) that you're working with that peer on.
+
+The simplest workflow is something like this:
+
+```ts
+client = new Client({ id: 'my-peer-id', url })
+client.join('my-document-id')
+client.on('peer', (peer, key) => {
+  const socket = peer.get(key) // `socket` is a WebSocket instance
+
+  // send a message
+  socket.send('Hello!')
+
+  // listen for messages
+  socket.onmessage = () => {
+    console.log(messsage)
+  }
+})
+```
 
 ## API
 
@@ -105,5 +130,5 @@ MIT
 Inspired by https://github.com/orionz/discovery-cloud-server
 
 [client]: ./packages/relay-client/README.md
-[relay-standalone]: https://github.com/local-first-web/relay-deployable
+[@localfirst/relay-standalone]: https://github.com/local-first-web/relay-deployable
 [server tests]: ./packages/relay/src/Server.test.ts
