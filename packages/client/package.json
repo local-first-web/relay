@@ -1,6 +1,6 @@
 {
   "name": "@localfirst/relay-client",
-  "version": "1.0.2",
+  "version": "1.0.4",
   "license": "MIT",
   "description": "Client for @localfirst/relay",
   "main": "dist/src/index.js",
@@ -40,5 +40,5 @@
       "/dist"
     ]
   },
-  "gitHead": "095389e4be69af5cec2a123d6796c77c48c33035"
+  "gitHead": "5dc0ed947e262c346acab06f5c945e02f34a1b35"
 }
