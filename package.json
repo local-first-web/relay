@@ -4,7 +4,7 @@
   "repository": "https://github.com/local-first-web/relay",
   "author": "herb@devresults.com",
   "license": "MIT",
-  "private": true,
+  "private": false,
   "scripts": {
     "build": "lerna run build",
     "start": "yarn workspace @localfirst/relay start",
