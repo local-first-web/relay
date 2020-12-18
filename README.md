@@ -33,7 +33,7 @@ This service offers a solution to each of these two problems.
 Alice can provide one or more document keys that she's interested in. (A document key is a unique ID
 for a topic or channel &mdash; it could be a GUID, or just a string like `ambitious-mongoose`.)
 
-![diagram](./images/relay-introduction.png)
+[![diagram](./images/relay-introduction.png)](https://raw.githubusercontent.com/local-first-web/relay/master/images/relay-introduction.png)
 
 If
 Bob is interested in the same key or keys, each will receive an `Introduction` message with the
@@ -44,7 +44,7 @@ other's id. They can then use that information to connect.
 Alice can request to connect with Bob on a given document key. If we get matching connection
 requests from Alice and Bob, we pipe their sockets together.
 
-![diagram](./images/relay-connection.png)
+[![diagram](./images/relay-connection.png)](https://raw.githubusercontent.com/local-first-web/relay/master/images/relay-connection.png)
 
 ## How
 
