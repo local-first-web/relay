@@ -10,11 +10,11 @@ Deploy to:
 [AWS](http://github.com/local-first-web/relay-deployable#deploying-to-aws-elastic-beanstalk) |
 [Google](http://github.com/local-first-web/relay-deployable#deploying-to-google-cloud) |
 [Azure](http://github.com/local-first-web/relay-deployable#deploying-to-azure) |
-[local deployment](http://github.com/local-first-web/relay-deployable#installing-and-running-locally)
+[local server](http://github.com/local-first-web/relay-deployable#installing-and-running-locally)
 
 ## Why
 
-<img src='./images/relay-1.png' height='200' align='center' ></img>
+<img src='./images/relay-1.png' width='500' align='center' ></img>
 
 Getting two end-user devices to communicate with each other over the internet is
 [hard](https://tailscale.com/blog/how-nat-traversal-works/). Most devices don't have stable public
@@ -30,12 +30,13 @@ This service offers a solution to each of these two problems.
 
 ### 1. Introduction
 
-Alice can provide one or more document keys that she's interested in. (A document key is just a
-unique ID for a topic or channel &mdash; it could be a GUID, or something like `ambitious-mongoose`.) If
-Bob is interested in the same key or keys, each will receive an `Introduction` message with the
-other's id. They can then use that information to connect.
+Alice can provide one or more document keys that she's interested in. (A document key is a unique ID for a topic or channel &mdash; it could be a GUID, or just a string like `ambitious-mongoose`.)
 
 ![diagram](./images/relay-introduction.png)
+
+If
+Bob is interested in the same key or keys, each will receive an `Introduction` message with the
+other's id. They can then use that information to connect.
 
 ### 2. Connection
 
@@ -71,8 +72,15 @@ fish emoji:
 ### Deploying to the cloud
 
 The recommended way to stand one of these up is to use the [relay-deployable] repo, which is
-optimized for deployment. In that repo you'll find instructions for deploying to Heroku, AWS Elastic
-Beanstalk, Google Cloud Platform, and Glitch.
+optimized for deployment. 
+
+See instructions for deploying to:
+[Glitch](http://github.com/local-first-web/relay-deployable#deploying-to-glitch) |
+[Heroku](http://github.com/local-first-web/relay-deployable#deploying-to-heroku) |
+[AWS](http://github.com/local-first-web/relay-deployable#deploying-to-aws-elastic-beanstalk) |
+[Google](http://github.com/local-first-web/relay-deployable#deploying-to-google-cloud) |
+[Azure](http://github.com/local-first-web/relay-deployable#deploying-to-azure) |
+[local server](http://github.com/local-first-web/relay-deployable#installing-and-running-locally)
 
 ### Usage
 
@@ -104,7 +112,7 @@ client.on('peer', (peer, key) => {
 
 ### Security
 
-This server makes no security guarantees. Alice and Bob may want to:
+⚠ This server makes no security guarantees. Alice and Bob should probably:
 
 1. **Authenticate** each other, to ensure that "Alice" is actually Alice and "Bob" is actually Bob.
 2. **Encrypt** all communications with each other.
