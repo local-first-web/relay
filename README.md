@@ -30,7 +30,8 @@ This service offers a solution to each of these two problems.
 
 ### 1. Introduction
 
-Alice can provide one or more document keys that she's interested in. (A document key is a unique ID for a topic or channel &mdash; it could be a GUID, or just a string like `ambitious-mongoose`.)
+Alice can provide one or more document keys that she's interested in. (A document key is a unique ID
+for a topic or channel &mdash; it could be a GUID, or just a string like `ambitious-mongoose`.)
 
 ![diagram](./images/relay-introduction.png)
 
@@ -72,7 +73,7 @@ fish emoji:
 ### Deploying to the cloud
 
 The recommended way to stand one of these up is to use the [relay-deployable] repo, which is
-optimized for deployment. 
+optimized for deployment.
 
 See instructions for deploying to:
 [Glitch](http://github.com/local-first-web/relay-deployable#deploying-to-glitch) |
