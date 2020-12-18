@@ -1,5 +1,6 @@
 {
   "name": "@localfirst/relay",
+  "description": "A tiny service that helps local-first applications connect with peers on other devices",
   "version": "1.0.5",
   "license": "MIT",
   "main": "src/index.ts",
