@@ -1,6 +1,8 @@
 {
-  "name": "@localfirst/relay",
+  "name": "@localfirst/relay-monorepo",
   "version": "0.1.8",
+  "repository": "https://github.com/local-first-web/relay",
+  "author": "herb@devresults.com",
   "license": "MIT",
   "private": true,
   "scripts": {
@@ -46,8 +48,8 @@
   },
   "jest": {
     "projects": [
-      "<rootDir>/packages/relay-client",
-      "<rootDir>/packages/relay"
+      "<rootDir>/packages/client",
+      "<rootDir>/packages/server"
     ]
   }
 }

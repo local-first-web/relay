@@ -19,11 +19,11 @@
     "ws": "7"
   },
   "devDependencies": {
+    "@localfirst/relay": "^0.4.2",
     "@types/debug": "4",
     "@types/jest": "25",
     "@types/node": "13",
     "@types/ws": "6",
-    "@localfirst/relay": "^0.4.2",
     "jest": "25",
     "portfinder": "1",
     "rimraf": "3",
