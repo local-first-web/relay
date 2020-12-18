@@ -10,7 +10,7 @@
     "start": "yarn workspace @localfirst/relay start",
     "dev": "yarn workspace @localfirst/relay dev",
     "lint": "lerna run lint",
-    "publish": "lerna publish --yes",
+    "pub": "lerna publish --yes",
     "test": "jest",
     "test:log": "cross-env DEBUG='lf*' DEBUG_COLORS=1 yarn test",
     "test:watch": "jest --watch",

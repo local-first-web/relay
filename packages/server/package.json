@@ -3,6 +3,7 @@
   "version": "0.4.2",
   "license": "MIT",
   "main": "src/index.ts",
+  "private": false,
   "scripts": {
     "prebuild": "rimraf dist",
     "build": "tsc",

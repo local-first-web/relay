@@ -2,9 +2,10 @@
   "name": "@localfirst/relay-client",
   "version": "0.4.2",
   "license": "MIT",
-  "description": "",
+  "description": "Client for @localfirst/relay",
   "main": "dist/src/index.js",
   "types": "dist/src/index.d.ts",
+  "private": false,
   "scripts": {
     "prebuild": "rimraf dist",
     "build": "tsc",
@@ -13,9 +14,9 @@
   },
   "author": "",
   "dependencies": {
+    "cuid": "2",
     "debug": "4",
     "ts-node": "8",
-    "cuid": "2",
     "ws": "7"
   },
   "devDependencies": {
