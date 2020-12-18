@@ -1,6 +1,6 @@
 {
   "name": "@localfirst/relay",
-  "version": "1.0.2",
+  "version": "1.0.4",
   "license": "MIT",
   "main": "src/index.ts",
   "private": false,
