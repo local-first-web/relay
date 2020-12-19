@@ -1,6 +1,6 @@
 {
   "name": "@localfirst/relay-client",
-  "version": "1.0.7",
+  "version": "1.0.8",
   "license": "MIT",
   "description": "Client for @localfirst/relay",
   "main": "dist/src/index.js",
@@ -20,7 +20,7 @@
     "ws": "7"
   },
   "devDependencies": {
-    "@localfirst/relay": "1",
+    "@localfirst/relay": "^1.0.8",
     "@types/debug": "4",
     "@types/jest": "26",
     "@types/node": "14",
