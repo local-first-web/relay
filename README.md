@@ -1,5 +1,5 @@
-<img src='https://raw.githubusercontent.com/local-first-web/branding/main/svg/relay-v.svg'
-width='250' alt="@localfirst/relay logo"/>
+<img src='https://raw.githubusercontent.com/local-first-web/branding/main/svg/relay-h.svg'
+width='600' alt="@localfirst/relay logo"/>
 
 `@localfirst/relay` is a tiny service that helps local-first applications connect with peers on
 other devices. It can run in the cloud or on any device with a known address.
@@ -35,8 +35,7 @@ for a topic or channel &mdash; it could be a GUID, or just a string like `ambiti
 
 [![diagram](./images/relay-introduction.png)](https://raw.githubusercontent.com/local-first-web/relay/master/images/relay-introduction.png)
 
-If
-Bob is interested in the same key or keys, each will receive an `Introduction` message with the
+If Bob is interested in the same key or keys, each will receive an `Introduction` message with the
 other's id. They can then use that information to connect.
 
 ### 2. Connection
