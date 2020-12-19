@@ -4,7 +4,7 @@
   "repository": "https://github.com/local-first-web/relay",
   "author": "herb@devresults.com",
   "license": "MIT",
-  "private": false,
+  "private": true,
   "scripts": {
     "build": "lerna run build",
     "start": "yarn workspace @localfirst/relay start",
@@ -16,19 +16,13 @@
     "test:watch": "jest --watch",
     "purge": "scripts/purge.bat"
   },
-  "dependencies": {
-    "esm": "3"
-  },
   "devDependencies": {
-    "@types/jest": "25",
-    "cross-env": "6",
-    "jest": "25",
+    "@types/jest": "26",
+    "cross-env": "7",
+    "jest": "26",
     "lerna": "3",
     "npm-run-all": "4",
-    "ts-jest": "25"
-  },
-  "engines": {
-    "yarn": ">=1.17.0"
+    "ts-jest": "26"
   },
   "workspaces": {
     "packages": [
@@ -41,7 +35,6 @@
   },
   "prettier": {
     "printWidth": 100,
-    "arrowParens": "avoid",
     "semi": false,
     "singleQuote": true,
     "trailingComma": "es5"
