@@ -10,7 +10,7 @@
     "build": "tsc",
     "start": "node dist/start.js",
     "test": "jest",
-    "dev": "cross-env DEBUG='localfirst*' DEBUG_COLORS=1 ts-node-dev --respawn --transpileOnly src/start.ts"
+    "dev": "cross-env DEBUG='lf*' DEBUG_COLORS=1 ts-node-dev --respawn --transpileOnly src/start.ts"
   },
   "dependencies": {
     "bs58": "4",
