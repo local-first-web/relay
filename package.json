@@ -8,6 +8,7 @@
   "scripts": {
     "build": "lerna run build",
     "start": "yarn workspace @localfirst/relay start",
+    "start:log": "cross-env DEBUG='lf*' DEBUG_COLORS=1 yarn start",
     "dev": "yarn workspace @localfirst/relay dev",
     "lint": "lerna run lint",
     "pub": "lerna publish --yes",
