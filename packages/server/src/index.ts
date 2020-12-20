@@ -1,2 +1,2 @@
 export * from './Server'
-export { Message, ConnectionEvent } from './types'
+export { Message } from './types'

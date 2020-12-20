@@ -25,15 +25,3 @@ export namespace Message {
     keys: string[] // document IDs
   }
 }
-
-export declare enum ConnectionEvent {
-  OPEN = 'open',
-  READY = 'ready',
-  CONNECTION = 'connection',
-  CLOSE = 'close',
-  ERROR = 'error',
-  PEER = 'peer',
-  PEER_REMOVE = 'peer_remove',
-  MESSAGE = 'message',
-  DATA = 'data',
-}

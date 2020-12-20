@@ -1,13 +1,9 @@
 import debug, { Debugger } from 'debug'
 import { EventEmitter } from 'events'
-
-import { Peer } from './Peer'
-import { Message } from '@localfirst/relay'
-import { ClientOptions } from './types'
+import { CLOSE, OPEN, PEER } from './constants'
 import { newid } from './newid'
-import { ConnectionEvent } from '@localfirst/relay'
-
-const { OPEN, CLOSE, PEER } = ConnectionEvent
+import { Peer } from './Peer'
+import { ClientOptions, Message } from './types'
 
 const initialRetryDelay = 1000
 const backoffCoeff = 1.5 + Math.random() * 0.1
@@ -27,7 +23,7 @@ const backoffCoeff = 1.5 + Math.random() * 0.1
  * ```ts
  * client = new Client({ id: 'my-peer-id', url })
  * client.join('my-document-id')
- * client.on('peer', (peer, key) => {
+ * client.on(peer, (peer, key) => {
  *   const socket = peer.get(key) // `socket` is a WebSocket instance
  *
  *   // send a message
@@ -52,7 +48,7 @@ export class Client extends EventEmitter {
 
   /**
    * @param id a string that identifies you uniquely, defaults to a UUID
-   * @param url the url of the `relay`, e.g. `http://signal.mydomain.com`
+   * @param url the url of  the `relay`, e.g. `http://signal.mydomain.com`
    */
   constructor({ id = newid(), url }: ClientOptions) {
     super()
@@ -127,7 +123,7 @@ export class Client extends EventEmitter {
     this.log('leaving', key)
 
     this.keys.delete(key)
-    this.peers.forEach(peer => peer.close(key))
+    this.peers.forEach((peer) => peer.close(key))
 
     this.sendToServer({
       type: 'Leave',
@@ -152,9 +148,9 @@ export class Client extends EventEmitter {
         {
           const { id, keys = [] } = msg
           const peer = this.peers.get(id) || this.connectToPeer(id)
-          const newKeys = keys.filter(key => !peer.has(key))
-          newKeys.forEach(key => {
-            peer.on(OPEN, peerKey => {
+          const newKeys = keys.filter((key) => !peer.has(key))
+          newKeys.forEach((key) => {
+            peer.on(OPEN, (peerKey) => {
               this.log('found peer', id, peerKey)
               this.emit(PEER, peer, key)
             })

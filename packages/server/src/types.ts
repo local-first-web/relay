@@ -30,15 +30,3 @@ export namespace Message {
 export type ClientID = string
 
 export type DocumentID = string
-
-export enum ConnectionEvent {
-  OPEN = 'open',
-  READY = 'ready',
-  CONNECTION = 'connection',
-  CLOSE = 'close',
-  ERROR = 'error',
-  PEER = 'peer',
-  PEER_REMOVE = 'peer_remove',
-  MESSAGE = 'message',
-  DATA = 'data',
-}

@@ -97,7 +97,7 @@ track of each key (aka discoveryKey, aka channel) that you're working with that 
 ```ts
 client = new Client({ id: 'alice', url: 'myrelay.somedomain.com' })
 client.join('ambitious-mongoose')
-client.on('peer', (peer, key) => {
+client.on(peer, (peer, key) => {
   const socket = peer.get(key) // `socket` is a WebSocket instance
 
   // send a message

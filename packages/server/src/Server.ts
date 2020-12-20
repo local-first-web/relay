@@ -4,13 +4,11 @@ import express from 'express'
 import expressWs from 'express-ws'
 import { Server as HttpServer, Socket } from 'net'
 import WebSocket, { Data } from 'ws'
+import { CLOSE, MESSAGE } from './constants'
 import { deduplicate } from './lib/deduplicate'
 import { intersection } from './lib/intersection'
 import { pipeSockets } from './lib/pipeSockets'
 import { ClientID, ConnectRequestParams, KeySet, Message } from './types'
-import { ConnectionEvent } from './types'
-
-const { READY, CONNECTION, CLOSE, MESSAGE } = ConnectionEvent
 
 const { app } = expressWs(express())
 const fishPage =
@@ -91,7 +89,7 @@ export class Server extends EventEmitter {
     const applyJoinAndLeave = (current: KeySet = [], join: KeySet = [], leave: KeySet = []) => {
       return current
         .concat(join) // add `join` keys
-        .filter(key => !leave.includes(key)) // remove `leave` keys
+        .filter((key) => !leave.includes(key)) // remove `leave` keys
         .reduce(deduplicate, []) // filter out duplicates
     }
 
@@ -173,7 +171,7 @@ export class Server extends EventEmitter {
       const peerB = this.holding[BseeksA]
 
       // Send any stored messages
-      this.messages[BseeksA].forEach(message => peerA.send(message))
+      this.messages[BseeksA].forEach((message) => peerA.send(message))
 
       // Pipe the two sockets together
       pipeSockets(peerA, peerB)
@@ -187,7 +185,7 @@ export class Server extends EventEmitter {
   // SERVER
 
   listen({ silent = false }: ListenOptions = {}) {
-    return new Promise<void>(resolve => {
+    return new Promise<void>((resolve) => {
       // It's nice to be able to hit this server from a browser as a sanity check
       app.get('/', (req, res, next) => {
         this.log('get /')
@@ -211,18 +209,18 @@ export class Server extends EventEmitter {
         const msg = `🐟 Listening at http://localhost:${this.port}  `
         if (!silent) console.log(msg)
         this.log(msg)
-        this.emit(READY)
+        this.emit('ready')
         resolve()
       })
-      this.httpServer.on(CONNECTION, socket => this.sockets.push(socket))
+      this.httpServer.on('connection', (socket) => this.sockets.push(socket))
     })
   }
 
   close() {
-    return new Promise<void>(resolve => {
+    return new Promise<void>((resolve) => {
       if (this.httpServer) {
         this.log('attempting httpServer.close')
-        this.sockets.forEach(socket => socket.destroy())
+        this.sockets.forEach((socket) => socket.destroy())
         this.httpServer.close(() => {
           this.log('closed')
           this.emit(CLOSE)

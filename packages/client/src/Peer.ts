@@ -1,11 +1,9 @@
 import Debug from 'debug'
-import { PeerOptions } from './types'
 import { EventEmitter } from 'events'
-
-import { ConnectionEvent } from '@localfirst/relay'
+import { CLOSE, OPEN } from './constants'
+import { PeerOptions } from './types'
 
 const log = Debug('lf:relay-client:peer')
-const { OPEN, CLOSE } = ConnectionEvent
 
 /**
  * The Peer class holds one or more sockets, one per key (aka discoveryKey aka channel).
@@ -41,7 +39,7 @@ export class Peer extends EventEmitter {
     this.keys.set(key, socket)
 
     const onopen = () => {
-      log('open', key)
+      log(OPEN, key)
       this.emit(OPEN, key)
     }
     const onclose = () => {

@@ -1,10 +1,9 @@
-import { ConnectionEvent, Server } from '@localfirst/relay'
+import { Server } from '@localfirst/relay'
 import debug from 'debug'
 import { getPortPromise as getAvailablePort } from 'portfinder'
 import { Client } from './Client'
+import { PEER } from './constants'
 import { Peer } from './Peer'
-
-const { PEER } = ConnectionEvent
 
 describe('Client', () => {
   const log = debug('lf:relay-client:tests')
@@ -61,14 +60,14 @@ describe('Client', () => {
       remoteClient.join(key)
 
       await Promise.all([
-        new Promise<void>(resolve => {
-          localClient.on(PEER, peer => {
+        new Promise<void>((resolve) => {
+          localClient.on(PEER, (peer) => {
             expect(peer.id).toEqual(remoteId)
             resolve()
           })
         }),
-        new Promise<void>(resolve => {
-          remoteClient.on(PEER, peer => {
+        new Promise<void>((resolve) => {
+          remoteClient.on(PEER, (peer) => {
             expect(peer.id).toEqual(localId)
             resolve()
           })
@@ -81,7 +80,7 @@ describe('Client', () => {
     let localClient: Client
     let remoteClient: Client
 
-    it('should send a message to a remote peer', done => {
+    it('should send a message to a remote peer', (done) => {
       localClient = new Client({ id: localId, url })
       remoteClient = new Client({ id: remoteId, url })
 
