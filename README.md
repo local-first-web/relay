@@ -64,8 +64,7 @@ $ node dist/start.js
 🐟 Listening at http://localhost:8080
 ```
 
-You can visit that URL with a web browser to confirm that it's working; you should see a big ol'
-fish emoji:
+You can visit that URL with a web browser to confirm that it's working; you should see something like this:
 
 <img src='./images/screenshot.png' width='300' align='center' />
 
