@@ -1,13 +1,11 @@
-import WebSocket from 'ws'
+import * as WebSocket from 'ws'
 
 export type ConnectRequestParams = {
-  peerA: WebSocket
+  socket: WebSocket
   A: ClientID
   B: ClientID
   key: DocumentID
 }
-
-export type KeySet = string[]
 
 export namespace Message {
   export type ClientToServer = Join
