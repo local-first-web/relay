@@ -1,5 +1,6 @@
 import debug, { Debugger } from 'debug'
 import { EventEmitter } from 'events'
+import { WebSocketDuplex } from 'websocket-stream'
 import { CLOSE, OPEN, PEER } from './constants'
 import { newid } from './newid'
 
@@ -40,12 +41,13 @@ const backoffCoeff = 1.5 + Math.random() * 0.1
  * ```
  */
 export class Client extends EventEmitter {
-  id: string
-  url: string
-  keys: Set<string> = new Set()
-  peers: Map<string, Peer> = new Map()
-  serverConnection: WebSocket
-  retryDelay: number
+  public id: string
+  public url: string
+  public keys: Set<string> = new Set()
+  public serverConnection: WebSocket
+
+  private peers: Map<string, Peer> = new Map()
+  private retryDelay: number
 
   log: Debugger
 
@@ -74,18 +76,6 @@ export class Client extends EventEmitter {
     this.sendToServer({
       type: 'Join',
       join: [key],
-    })
-  }
-
-  leave(key: string) {
-    this.log('leaving', key)
-
-    this.keys.delete(key)
-    this.peers.forEach((peer) => peer.remove(key))
-
-    this.sendToServer({
-      type: 'Leave',
-      leave: [key],
     })
   }
 
@@ -189,5 +179,5 @@ EventEmitter.defaultMaxListeners = 500
 export interface PeerEventPayload {
   key: string
   id: string
-  socket: WebSocket
+  socket: WebSocketDuplex
 }
