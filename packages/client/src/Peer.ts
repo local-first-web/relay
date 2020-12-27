@@ -1,24 +1,17 @@
 import { EventEmitter } from 'events'
+import wsStream, { WebSocketDuplex } from 'websocket-stream'
 import { OPEN } from './constants'
 import { PeerOptions } from './types'
 
 /**
  * The Peer class holds one or more sockets, one per key (aka discoveryKey aka channel).
- * To get the socket corresponding to a given key:
- * ```ts
- * const socket = peer.get(key)
- * ```
- *
- * You interact with that socket just like you would any socket:
- * ```ts
- * socket.send('hello!')
- * socket.on(MESSAGE, message => {...})
- * ```
+ * It's not exported from the package and should be treated as private - consumers can
+ * get the appropriate port from
  */
 export class Peer extends EventEmitter {
   id: string
   url: string
-  private sockets: Map<string, WebSocket> = new Map() // key -> socket
+  private sockets: Map<string, WebSocketDuplex> = new Map() // key -> socket
 
   constructor({ url, id }: PeerOptions) {
     super()
@@ -28,12 +21,11 @@ export class Peer extends EventEmitter {
 
   add(key: string) {
     // don't add twice
-    if (this.sockets.has(key)) return
-
-    const socket = new WebSocket(`${this.url}/${this.id}/${key}`)
-    this.sockets.set(key, socket)
-
-    socket.addEventListener('open', () => this.emit(OPEN, key))
+    if (!this.sockets.has(key)) {
+      const socket = wsStream(`${this.url}/${this.id}/${key}`)
+      this.sockets.set(key, socket)
+      this.emit(OPEN, key)
+    }
   }
 
   has(key: string): boolean {
@@ -47,7 +39,8 @@ export class Peer extends EventEmitter {
   remove(key: string) {
     const socket = this.get(key)
     if (socket) {
-      socket.close()
+      socket.end()
+      socket.destroy()
       this.sockets.delete(key)
     }
   }
