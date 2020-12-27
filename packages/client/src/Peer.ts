@@ -1,9 +1,6 @@
-import Debug from 'debug'
 import { EventEmitter } from 'events'
-import { CLOSE, OPEN } from './constants'
+import { OPEN } from './constants'
 import { PeerOptions } from './types'
-
-const log = Debug('lf:relay-client:peer')
 
 /**
  * The Peer class holds one or more sockets, one per key (aka discoveryKey aka channel).
@@ -21,7 +18,7 @@ const log = Debug('lf:relay-client:peer')
 export class Peer extends EventEmitter {
   id: string
   url: string
-  private keys: Map<string, WebSocket> = new Map() // key -> socket
+  private sockets: Map<string, WebSocket> = new Map() // key -> socket
 
   constructor({ url, id }: PeerOptions) {
     super()
@@ -31,52 +28,27 @@ export class Peer extends EventEmitter {
 
   add(key: string) {
     // don't add twice
-    if (this.keys.has(key)) return
+    if (this.sockets.has(key)) return
 
-    const id = this.id
-    const url = `${this.url}/${id}/${key}`
+    const socket = new WebSocket(`${this.url}/${this.id}/${key}`)
+    this.sockets.set(key, socket)
 
-    const socket = new WebSocket(url)
-    this.keys.set(key, socket)
-
-    const onopen = () => {
-      log(OPEN, key)
-      this.emit(OPEN, key)
-    }
-    socket.onopen = onopen.bind(this)
-
-    const onclose = () => {
-      log('socket.onclose')
-      this.emit(CLOSE)
-      this.remove(key)
-    }
-    socket.onclose = onclose.bind(this)
-
-    const onerror = ({ err }: any) => {
-      log('socket.onerror %s', err)
-    }
-    socket.onerror = onerror.bind(this)
+    socket.addEventListener('open', () => this.emit(OPEN, key))
   }
 
   has(key: string): boolean {
-    return this.keys.has(key)
+    return this.sockets.has(key)
   }
 
   get(key: string) {
-    return this.keys.get(key)
-  }
-
-  close(key: string) {
-    const socket = this.get(key)
-    if (socket) {
-      log('%s closing socket: %s', this.id, key)
-      socket.close()
-      this.keys.delete(key)
-    }
+    return this.sockets.get(key)
   }
 
   remove(key: string) {
-    log('%s removing connection: %s', this.id, key)
-    this.keys.delete(key)
+    const socket = this.get(key)
+    if (socket) {
+      socket.close()
+      this.sockets.delete(key)
+    }
   }
 }
