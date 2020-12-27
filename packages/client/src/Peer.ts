@@ -30,6 +30,7 @@ export class Peer extends EventEmitter {
   }
 
   add(key: string) {
+    // don't add twice
     if (this.keys.has(key)) return
 
     const id = this.id
@@ -42,17 +43,18 @@ export class Peer extends EventEmitter {
       log(OPEN, key)
       this.emit(OPEN, key)
     }
+    socket.onopen = onopen.bind(this)
+
     const onclose = () => {
       log('socket.onclose')
       this.emit(CLOSE)
       this.remove(key)
     }
+    socket.onclose = onclose.bind(this)
+
     const onerror = ({ err }: any) => {
       log('socket.onerror %s', err)
     }
-
-    socket.onopen = onopen.bind(this)
-    socket.onclose = onclose.bind(this)
     socket.onerror = onerror.bind(this)
   }
 
