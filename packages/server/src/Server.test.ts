@@ -1,3 +1,4 @@
+import wsStream from 'websocket-stream'
 import debug from 'debug'
 import WebSocket from 'ws'
 import { Server } from './Server'
@@ -99,7 +100,7 @@ describe('Server', () => {
   })
 
   describe('Peer connections', () => {
-    it('should pipe connections between two peers', (done) => {
+    it.only('should pipe connections between two peers', (done) => {
       const { aliceId, bobId, key } = setup()
 
       const aliceRequest = requestIntroduction(aliceId, key)
@@ -116,18 +117,18 @@ describe('Server', () => {
         })
 
         const alice = new WebSocket(`${url}/connection/${aliceId}/${bobId}/${key}`)
-        const remotePeer = new WebSocket(`${url}/connection/${bobId}/${aliceId}/${key}`)
+        const bob = new WebSocket(`${url}/connection/${bobId}/${aliceId}/${key}`)
 
         // send message from local to remote
         alice.once(OPEN, () => alice.send('DUDE!!'))
-        remotePeer.once(MESSAGE, (d) => {
-          expect(d).toEqual('DUDE!!')
+        bob.once('message', (data) => {
+          expect(data.toString()).toEqual('DUDE!!')
         })
 
         // send message from remote to local
-        remotePeer.once(OPEN, () => remotePeer.send('hello'))
-        alice.once(MESSAGE, (d) => {
-          expect(d).toEqual('hello')
+        bob.once(OPEN, () => bob.send('hello'))
+        alice.once('message', (data) => {
+          expect(data.toString()).toEqual('hello')
           done()
         })
       })
@@ -149,11 +150,11 @@ describe('Server', () => {
           alice.close()
         })
 
-        bob.once(MESSAGE, (d) => {
+        bob.once('data', (d) => {
           expect(d).toEqual('hey bob!')
 
           bob.send('sup alice')
-          alice.once(MESSAGE, (d) => {
+          alice.once('data', (d) => {
             throw new Error('should never get here')
           })
           done()
