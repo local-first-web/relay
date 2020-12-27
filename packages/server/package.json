@@ -16,6 +16,7 @@
     "bs58": "4",
     "express": "4",
     "express-ws": "4",
+    "websocket-stream": "^5.5.2",
     "ws": "7"
   },
   "devDependencies": {
