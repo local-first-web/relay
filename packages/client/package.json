@@ -17,6 +17,7 @@
     "cuid": "2",
     "debug": "4",
     "ts-node": "9",
+    "websocket-stream": "^5.5.2",
     "ws": "7"
   },
   "devDependencies": {
