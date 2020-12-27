@@ -2,6 +2,7 @@ import debug, { Debugger } from 'debug'
 import { EventEmitter } from 'events'
 import { CLOSE, OPEN, PEER } from './constants'
 import { newid } from './newid'
+
 import { Peer } from './Peer'
 import { ClientOptions, Message } from './types'
 
@@ -17,6 +18,8 @@ const backoffCoeff = 1.5 + Math.random() * 0.1
  *
  * The client keeps track of all peers that the server connects you to, and for each peer it keeps
  * track of each key (aka discoveryKey, aka channel) that you're working with that peer on.
+ *
+ * The peers are WebSocket instances
  *
  * The simplest workflow is something like this:
  *
@@ -44,7 +47,7 @@ export class Client extends EventEmitter {
   serverConnection: WebSocket
   retryDelay: number
 
-  log: Debugger
+  // log: Debugger
 
   /**
    * @param id a string that identifies you uniquely, defaults to a UUID
@@ -52,7 +55,7 @@ export class Client extends EventEmitter {
    */
   constructor({ id = newid(), url }: ClientOptions) {
     super()
-    this.log = debug(`lf:relay-client:${id}`)
+    // this.log = debug(`lf:relay-client:${id}`)
 
     this.id = id
     this.url = url
@@ -63,7 +66,7 @@ export class Client extends EventEmitter {
   private connectToServer(): WebSocket {
     const url = `${this.url}/introduction/${this.id}`
 
-    this.log('connecting to signal server', url)
+    // this.log('connecting to signal server', url)
 
     this.serverConnection = new WebSocket(url)
 
@@ -80,21 +83,21 @@ export class Client extends EventEmitter {
 
     const onclose = () => {
       this.retryDelay *= backoffCoeff
-      this.log(
-        `signal server connection closed... retrying in ${Math.floor(this.retryDelay / 1000)}s`
-      )
+      // this.log(
+      //   `signal server connection closed... retrying in ${Math.floor(this.retryDelay / 1000)}s`
+      // )
       setTimeout(() => this.connectToServer(), this.retryDelay)
       this.emit(CLOSE)
     }
 
     const onmessage = ({ data }: { data: string }) => {
-      this.log('message from signal server', data)
+      // this.log('message from signal server', data)
       const message = JSON.parse(data.toString()) as Message.ServerToClient
       this.receiveFromServer(message)
     }
 
     const onerror = (args: any) => {
-      this.log('signal server error', args)
+      // this.log('signal server error', args)
     }
 
     this.serverConnection.onopen = onopen.bind(this)
@@ -109,7 +112,7 @@ export class Client extends EventEmitter {
   // other peers who have joined the same key, you and the remote peer will both receive an
   // introduction message, inviting you to connect.
   join(key: string) {
-    this.log('joining', key)
+    // this.log('joining', key)
 
     this.keys.add(key)
 
@@ -120,7 +123,7 @@ export class Client extends EventEmitter {
   }
 
   leave(key: string) {
-    this.log('leaving', key)
+    // this.log('leaving', key)
 
     this.keys.delete(key)
     this.peers.forEach((peer) => peer.close(key))
@@ -131,9 +134,15 @@ export class Client extends EventEmitter {
     })
   }
 
+  getSocket(id: string, key: string) {
+    return this.peers.get(id).get(key)
+  }
+
+  ////// PRIVATE
+
   private sendToServer(msg: Message.ClientToServer) {
     if (this.serverConnection.readyState === WebSocket.OPEN) {
-      this.log('sending to server %o', msg)
+      // this.log('sending to server %o', msg)
       this.serverConnection.send(JSON.stringify(msg))
     }
   }
@@ -142,27 +151,32 @@ export class Client extends EventEmitter {
   // us that someone else is interested in the same thing we are. When we receive that message, we
   // automatically try to connect "directly" to the peer (via piped sockets on the signaling server).
   private receiveFromServer(msg: Message.ServerToClient) {
-    this.log('received from signal server %o', msg)
+    // this.log('received from signal server %o', msg)
     switch (msg.type) {
       case 'Introduction':
-        {
-          const { id, keys = [] } = msg
-          const peer = this.peers.get(id) || this.connectToPeer(id)
-          const newKeys = keys.filter((key) => !peer.has(key))
-          newKeys.forEach((key) => {
-            peer.on(OPEN, (peerKey) => {
-              this.log('found peer', id, peerKey)
-              this.emit(PEER, peer, key)
-            })
-            peer.add(key)
+        const { id, keys = [] } = msg
+
+        // connect to peer, or use existing connection
+        const peer = this.peers.get(id) || this.connectToPeer(id)
+
+        // identify any keys for which we don't already have a connection to this peer
+        const newKeys = keys.filter((key) => !peer.has(key))
+        newKeys.forEach((key) => {
+          peer.on(OPEN, (peerKey) => {
+            // this.log('found peer', id, peerKey)
+            const socket = peer.get(key)
+            this.emit(PEER, { key: peerKey, id, socket } as PeerEventPayload)
           })
-        }
+          peer.add(key)
+        })
         break
+      default:
+        throw new Error(`Invalid message type '${msg.type}'`)
     }
   }
 
   private connectToPeer(id: string): Peer {
-    this.log('requesting direct connection to peer', id)
+    // this.log('requesting direct connection to peer', id)
     const url = `${this.url}/connection/${this.id}` // remaining parameters are added by peer
     const peer = new Peer({ url, id })
     this.peers.set(id, peer)
@@ -173,3 +187,9 @@ export class Client extends EventEmitter {
 // It's normal for a document with a lot of participants to have a lot of connections, so increase
 // the limit to avoid spurious warnings about emitter leaks.
 EventEmitter.defaultMaxListeners = 500
+
+export interface PeerEventPayload {
+  key: string
+  id: string
+  socket: WebSocket
+}

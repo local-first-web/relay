@@ -1,9 +1,8 @@
 import { Server } from '@localfirst/relay'
 import debug from 'debug'
 import { getPortPromise as getAvailablePort } from 'portfinder'
-import { Client } from './Client'
+import { Client, PeerEventPayload } from './Client'
 import { PEER } from './constants'
-import { Peer } from './Peer'
 
 describe('Client', () => {
   const log = debug('lf:relay-client:tests')
@@ -13,8 +12,8 @@ describe('Client', () => {
   let server: Server
   let key: string
   let testId: number = 0
-  let localId: string
-  let remoteId: string
+  let aliceId: string
+  let bobId: string
 
   beforeAll(async () => {
     // find a port and set things up
@@ -27,8 +26,8 @@ describe('Client', () => {
 
   beforeEach(() => {
     testId += 1
-    localId = `local-${testId}`
-    remoteId = `remote-${testId}`
+    aliceId = `alice-${testId}`
+    bobId = `bob-${testId}`
     key = `test-key-${testId}`
     log(`TEST ${testId}`)
   })
@@ -43,32 +42,32 @@ describe('Client', () => {
     let client: Client
 
     it('should connect to the discovery server', () => {
-      client = new Client({ id: localId, url })
-      expect(client.serverConnection.url).toContain(`ws://localhost:${port}/introduction/local`)
+      client = new Client({ id: aliceId, url })
+      expect(client.serverConnection.url).toContain(`ws://localhost:${port}/introduction/alice`)
     })
   })
 
   describe('Join', () => {
-    let localClient: Client
-    let remoteClient: Client
+    let alice: Client
+    let bob: Client
 
     it('should connect to a peer', async () => {
-      localClient = new Client({ id: localId, url })
-      remoteClient = new Client({ id: remoteId, url })
+      alice = new Client({ id: aliceId, url })
+      bob = new Client({ id: bobId, url })
 
-      localClient.join(key)
-      remoteClient.join(key)
+      alice.join(key)
+      bob.join(key)
 
       await Promise.all([
         new Promise<void>((resolve) => {
-          localClient.on(PEER, (peer) => {
-            expect(peer.id).toEqual(remoteId)
+          alice.on(PEER, ({ id }: PeerEventPayload) => {
+            expect(id).toEqual(bobId)
             resolve()
           })
         }),
         new Promise<void>((resolve) => {
-          remoteClient.on(PEER, (peer) => {
-            expect(peer.id).toEqual(localId)
+          bob.on(PEER, ({ id }: PeerEventPayload) => {
+            expect(id).toEqual(aliceId)
             resolve()
           })
         }),
@@ -77,24 +76,21 @@ describe('Client', () => {
   })
 
   describe('Send/Receive', () => {
-    let localClient: Client
-    let remoteClient: Client
+    let alice: Client
+    let bob: Client
 
     it('should send a message to a remote peer', (done) => {
-      localClient = new Client({ id: localId, url })
-      remoteClient = new Client({ id: remoteId, url })
+      alice = new Client({ id: aliceId, url })
+      bob = new Client({ id: bobId, url })
 
-      localClient.join(key)
-      remoteClient.join(key)
+      alice.join(key)
+      bob.join(key)
 
-      localClient.on(PEER, (peer: Peer) => {
-        const connection = peer.get(key)
-        connection.send('hello')
+      alice.on(PEER, ({ socket }: PeerEventPayload) => {
+        socket.send('hello')
       })
 
-      remoteClient.on(PEER, (peer: Peer) => {
-        const socket = peer.get(key)
-
+      bob.on(PEER, ({ socket }: PeerEventPayload) => {
         socket.onmessage = ({ data }) => {
           expect(data).toEqual('hello')
           done()
