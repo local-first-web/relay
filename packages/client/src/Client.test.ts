@@ -87,14 +87,14 @@ describe('Client', () => {
       bob.join(key)
 
       alice.on(PEER, ({ socket }: PeerEventPayload) => {
-        socket.send('hello')
+        socket.write('hello')
       })
 
       bob.on(PEER, ({ socket }: PeerEventPayload) => {
-        socket.onmessage = ({ data }) => {
-          expect(data).toEqual('hello')
+        socket.on('data', (data) => {
+          expect(data.toString()).toEqual('hello')
           done()
-        }
+        })
       })
     })
   })
