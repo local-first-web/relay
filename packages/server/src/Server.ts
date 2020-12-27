@@ -3,14 +3,16 @@ import { EventEmitter } from 'events'
 import express from 'express'
 import expressWs from 'express-ws'
 import { Server as HttpServer, Socket } from 'net'
-import WebSocket, { Data } from 'ws'
+import wsStream from 'websocket-stream'
+import { Data } from 'ws'
+import * as WebSocket from 'ws'
 import { CLOSE, MESSAGE } from './constants'
 import { deduplicate } from './lib/deduplicate'
 import { intersection } from './lib/intersection'
-import { pipeSockets } from './lib/pipeSockets'
-import { ClientID, ConnectRequestParams, KeySet, Message } from './types'
+import { ClientID, ConnectRequestParams, DocumentID, Message } from './types'
 
 const { app } = expressWs(express())
+
 const logoPage = `
   <body style="background:black; display:flex; justify-content:center; align-items:center">
     <img src="https://raw.githubusercontent.com/local-first-web/branding/main/svg/relay-v.svg" width="50%" alt="@localfirst/relay logo"/>
@@ -32,7 +34,7 @@ interface ListenOptions {
  *   just pipe their sockets together.
  */
 export class Server extends EventEmitter {
-  port: number
+  public port: number
 
   /**
    * In this context:
@@ -40,8 +42,8 @@ export class Server extends EventEmitter {
    * - `peer` is always a reference to a client's socket connection.
    * - `key` is always a document id (elsewhere referred to as a 'channel' or a 'discovery key'.
    */
-  peers: Record<ClientID, WebSocket>
-  keys: Record<ClientID, KeySet>
+  public peers: Record<ClientID, WebSocket>
+  public keys: Record<ClientID, DocumentID[]>
 
   /**
    * For two peers to connect, they both need to send a connection request, specifying both the
@@ -49,8 +51,8 @@ export class Server extends EventEmitter {
    * Bob, we temporarily store a reference to Alice's request in `holding`, and store any
    * messages from Bob in `messages`.
    */
-  private holding: Record<ClientID, WebSocket>
-  private messages: Record<ClientID, Data[]>
+
+  private holding: Record<ClientID, { socket: WebSocket; messages: Data[] }> = {}
 
   /**
    * When we start listening, we keep a reference to the `httpServer` so we can close it if asked to.
@@ -67,13 +69,59 @@ export class Server extends EventEmitter {
     this.port = port
     this.peers = {}
     this.keys = {}
-    this.holding = {}
-    this.messages = {}
+  }
+
+  // SERVER
+
+  listen({ silent = false }: ListenOptions = {}) {
+    return new Promise<void>((resolve) => {
+      // Allow hitting this server from a browser as a sanity check
+      app.get('/', (_, res) => {
+        res.send(logoPage)
+        res.end()
+      })
+
+      // Introduction request
+      app.ws('/introduction/:id', (ws, { params: { id } }) => {
+        this.log('received introduction request', id)
+        this.openIntroductionConnection(ws as WebSocket, id)
+      })
+
+      // Connection request
+      app.ws('/connection/:A/:B/:key', (ws, { params: { A, B, key } }) => {
+        this.log('received connection request', A, B)
+        this.openConnection({ socketA: ws as WebSocket, A, B, key })
+      })
+
+      this.httpServer = app.listen(this.port, () => {
+        const msg = `◆ Listening at http://localhost:${this.port}`
+        if (!silent) console.log(msg)
+        this.log(msg)
+        this.emit('ready')
+        resolve()
+      })
+
+      this.httpServer.on('connection', (socket) => this.sockets.push(socket))
+    })
+  }
+
+  close() {
+    return new Promise<void>((resolve) => {
+      if (this.httpServer) {
+        this.log('attempting httpServer.close')
+        this.sockets.forEach((socket) => socket.destroy())
+        this.httpServer.close(() => {
+          this.log('closed')
+          this.emit(CLOSE)
+          resolve()
+        })
+      } else this.log('nothing to close!')
+    })
   }
 
   // DISCOVERY
 
-  openIntroductionConnection(peer: WebSocket, id: ClientID) {
+  private openIntroductionConnection(peer: WebSocket, id: ClientID) {
     this.log('introduction connection', id)
     this.peers[id] = peer
 
@@ -88,7 +136,11 @@ export class Server extends EventEmitter {
 
     // An introduction request from the client will include a list of keys to join and/or leave.
     // We combine those keys with any we already have.
-    const applyJoinAndLeave = (current: KeySet = [], join: KeySet = [], leave: KeySet = []) => {
+    const applyJoinAndLeave = (
+      current: DocumentID[] = [],
+      join: DocumentID[] = [],
+      leave: DocumentID[] = []
+    ) => {
       return current
         .concat(join) // add `join` keys
         .filter((key) => !leave.includes(key)) // remove `leave` keys
@@ -97,7 +149,7 @@ export class Server extends EventEmitter {
 
     // If we find another peer interested in the same key(s), we send both peers an introduction,
     // which they can use to connect
-    const sendIntroduction = (A: ClientID, B: ClientID, keys: KeySet) => {
+    const sendIntroduction = (A: ClientID, B: ClientID, keys: DocumentID[]) => {
       const message = {
         type: 'Introduction',
         id: B, // the id of the other peer
@@ -123,7 +175,7 @@ export class Server extends EventEmitter {
           // find keys that both peers are interested in
           const commonKeys = intersection(this.keys[A], this.keys[B])
           if (commonKeys.length > 0) {
-            this.log('notifying', A, B, commonKeys)
+            this.log('sending introductions', A, B, commonKeys)
             sendIntroduction(A, B, commonKeys)
             sendIntroduction(B, A, commonKeys)
           }
@@ -132,7 +184,7 @@ export class Server extends EventEmitter {
     }
   }
 
-  closeIntroductionConnection(id: ClientID) {
+  private closeIntroductionConnection(id: ClientID) {
     return () => {
       delete this.peers[id]
       delete this.keys[id]
@@ -141,7 +193,7 @@ export class Server extends EventEmitter {
 
   // PEER CONNECTIONS
 
-  openConnection({ peerA, A, B, key }: ConnectRequestParams) {
+  private openConnection({ socketA, A, B, key }: ConnectRequestParams) {
     // A and B always refer to peers' client ids.
 
     // These are string keys for identifying this request and the reciprocal request
@@ -153,82 +205,35 @@ export class Server extends EventEmitter {
       // We haven't heard from Bob yet; hold this connection
       this.log('holding connection for peer', AseeksB)
 
-      this.holding[AseeksB] = peerA // hold Alice's socket ready
-      this.messages[AseeksB] = [] // hold any messages Alice sends to Bob in the meantime
+      this.holding[AseeksB] = {
+        socket: socketA, // hold Alice's socket ready
+        messages: [], // hold any messages Alice sends to Bob in the meantime
+      }
 
-      peerA.on(MESSAGE, (message: Data) => {
-        // hold on to incoming message from Alice for Bob
-        if (this.messages[AseeksB]) this.messages[AseeksB].push(message)
-      })
+      // hold on to incoming message from Alice for Bob
+      socketA.on(MESSAGE, (message) => this.holding[AseeksB]?.messages.push(message))
 
-      peerA.on(CLOSE, () => {
-        // clean up
-        delete this.holding[AseeksB]
-        delete this.messages[AseeksB]
-      })
+      // clean up
+      socketA.on(CLOSE, () => delete this.holding[AseeksB])
     } else {
       // We already have a connection request from Bob; hook them up
       this.log('found peer, connecting', AseeksB)
 
-      const peerB = this.holding[BseeksA]
+      const socketB = this.holding[BseeksA].socket
 
       // Send any stored messages
-      this.messages[BseeksA].forEach((message) => peerA.send(message))
+      this.holding[BseeksA].messages.forEach((message) => socketA.send(message))
 
       // Pipe the two sockets together
-      pipeSockets(peerA, peerB)
+
+      const aStream = wsStream(socketA)
+      const bStream = wsStream(socketB)
+
+      aStream.pipe(bStream)
+      bStream.pipe(aStream)
 
       // Don't need to hold the connection or messages any more
       delete this.holding[BseeksA]
-      delete this.messages[BseeksA]
     }
-  }
-
-  // SERVER
-
-  listen({ silent = false }: ListenOptions = {}) {
-    return new Promise<void>((resolve) => {
-      // It's nice to be able to hit this server from a browser as a sanity check
-      app.get('/', (req, res, next) => {
-        this.log('get /')
-        res.send(logoPage)
-        res.end()
-      })
-
-      // Introduction request
-      app.ws('/introduction/:id', (ws, { params: { id } }) => {
-        this.log('received introduction request', id)
-        this.openIntroductionConnection(ws as WebSocket, id)
-      })
-
-      // Connection request
-      app.ws('/connection/:A/:B/:key', (ws, { params: { A, B, key } }) => {
-        this.log('received connection request', A, B)
-        this.openConnection({ peerA: ws as WebSocket, A, B, key })
-      })
-
-      this.httpServer = app.listen(this.port, () => {
-        const msg = `◆ Listening at http://localhost:${this.port}`
-        if (!silent) console.log(msg)
-        this.log(msg)
-        this.emit('ready')
-        resolve()
-      })
-      this.httpServer.on('connection', (socket) => this.sockets.push(socket))
-    })
-  }
-
-  close() {
-    return new Promise<void>((resolve) => {
-      if (this.httpServer) {
-        this.log('attempting httpServer.close')
-        this.sockets.forEach((socket) => socket.destroy())
-        this.httpServer.close(() => {
-          this.log('closed')
-          this.emit(CLOSE)
-          resolve()
-        })
-      } else this.log('nothing to close!')
-    })
   }
 }
