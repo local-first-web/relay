@@ -5,121 +5,128 @@ import { getPortPromise as getAvailablePort } from 'portfinder'
 import { OPEN } from './constants'
 import { MESSAGE } from './constants'
 
-const log = debug('lf:relay:tests')
+// const log = debug('lf:relay:tests')
 
+/**
+ * In this context:
+ * - `id` is always a peer id.
+ * - `peer` is always a reference to a client's socket connection.
+ * - `key` is always a document id (elsewhere referred to as a 'channel' or a 'discovery key'.
+ */
 describe('Server', () => {
   let port: number
   let url: string
-  let introductionUrl: string
-  let connectionUrl: string
-
   let server: Server
-  let localId: string
-  let remoteId: string
-  let key: string
-  let testId: number = 0
+  let testId = 0
 
   beforeAll(async () => {
     // find a port and set things up
     port = await getAvailablePort({ port: 3100 })
     url = `ws://localhost:${port}`
-    introductionUrl = `${url}/introduction`
-    connectionUrl = `${url}/connection`
 
     server = new Server({ port })
     server.listen({ silent: true })
   })
 
-  beforeEach(() => {
+  const setup = () => {
     testId += 1
-    localId = `local-${testId}`
-    remoteId = `remote-${testId}`
-    key = `test-key-${testId}`
-    log(`TEST ${testId}`)
-  })
-
-  afterEach(() => {})
+    const aliceId = `alice-${testId}`
+    const bobId = `bob-${testId}`
+    const key = `test-key-${testId}`
+    return { aliceId, bobId, key }
+  }
 
   afterAll(() => {
     server.close()
   })
 
-  const makeIntroductionRequest = (id: string, key: string) => {
-    const peer = new WebSocket(`${introductionUrl}/${id}`)
-    const joinMessage = { type: 'Join', id: id, join: [key] }
+  const requestIntroduction = (id: string, key: string) => {
+    const peer = new WebSocket(`${url}/introduction/${id}`)
+    const joinMessage = {
+      type: 'Join',
+      id,
+      join: [key],
+    }
     peer.once(OPEN, () => peer.send(JSON.stringify(joinMessage)))
     return peer
   }
 
   describe('Introduction', () => {
     it('should make a connection', (done) => {
-      expect.assertions(3)
-
+      const { aliceId } = setup()
       server.once('introductionConnection', (id) => {
-        expect(id).toEqual(localId)
+        expect(id).toEqual(aliceId)
       })
 
-      const localPeer = new WebSocket(`${introductionUrl}/${localId}`)
+      const alice = new WebSocket(`${url}/introduction/${aliceId}`)
 
-      localPeer.once(OPEN, () => {
-        expect(server.peers).toHaveProperty(localId)
+      alice.once(OPEN, () => {
+        expect(server.peers).toHaveProperty(aliceId)
         expect(server.keys).toEqual({})
         done()
       })
     })
 
     it('should invite peers to connect', async () => {
-      expect.assertions(4)
+      const { aliceId, bobId, key } = setup()
+      const alice = requestIntroduction(aliceId, key)
+      const bob = requestIntroduction(bobId, key)
 
-      const localPeer = makeIntroductionRequest(localId, key)
-      const remotePeer = makeIntroductionRequest(remoteId, key)
-
-      const localDone = new Promise<void>((resolve) => {
-        localPeer.once(MESSAGE, (d) => {
+      const aliceDone = new Promise<void>((resolve) => {
+        alice.once(MESSAGE, (d) => {
           const invitation = JSON.parse(d.toString())
-          expect(invitation.id).toEqual(remoteId)
-          expect(invitation.keys).toEqual([key])
+          expect(invitation).toEqual({
+            type: 'Introduction',
+            id: bobId,
+            keys: [key],
+          })
           resolve()
         })
       })
-      const remoteDone = new Promise<void>((resolve) => {
-        remotePeer.once(MESSAGE, (d) => {
+      const bobDone = new Promise<void>((resolve) => {
+        bob.once(MESSAGE, (d) => {
           const invitation = JSON.parse(d.toString())
-          expect(invitation.id).toEqual(localId)
-          expect(invitation.keys).toEqual([key])
+          expect(invitation).toEqual({
+            type: 'Introduction',
+            id: aliceId,
+            keys: [key],
+          })
           resolve()
         })
       })
-      await Promise.all([localDone, remoteDone])
+      await Promise.all([aliceDone, bobDone])
     })
   })
 
   describe('Peer connections', () => {
     it('should pipe connections between two peers', (done) => {
-      expect.assertions(4)
+      const { aliceId, bobId, key } = setup()
 
-      const localIntroductionPeer = makeIntroductionRequest(localId, key)
-      const remoteIntroductionPeer = makeIntroductionRequest(remoteId, key) // need to make request even if we don't use the result
+      const aliceRequest = requestIntroduction(aliceId, key)
+      const bobRequest = requestIntroduction(bobId, key) // need to make request even if we don't use the result
 
-      localIntroductionPeer.once(MESSAGE, (d) => {
+      aliceRequest.once(MESSAGE, (d) => {
         // recap of previous test: we'll get an invitation to connect to the remote peer
         const invitation = JSON.parse(d.toString())
 
-        expect(invitation.id).toEqual(remoteId)
-        expect(invitation.keys).toEqual([key])
+        expect(invitation).toEqual({
+          type: 'Introduction',
+          id: bobId,
+          keys: [key],
+        })
 
-        const localPeer = new WebSocket(`${connectionUrl}/${localId}/${remoteId}/${key}`)
-        const remotePeer = new WebSocket(`${connectionUrl}/${remoteId}/${localId}/${key}`)
+        const alice = new WebSocket(`${url}/connection/${aliceId}/${bobId}/${key}`)
+        const remotePeer = new WebSocket(`${url}/connection/${bobId}/${aliceId}/${key}`)
 
         // send message from local to remote
-        localPeer.once(OPEN, () => localPeer.send('DUDE!!'))
+        alice.once(OPEN, () => alice.send('DUDE!!'))
         remotePeer.once(MESSAGE, (d) => {
           expect(d).toEqual('DUDE!!')
         })
 
         // send message from remote to local
         remotePeer.once(OPEN, () => remotePeer.send('hello'))
-        localPeer.once(MESSAGE, (d) => {
+        alice.once(MESSAGE, (d) => {
           expect(d).toEqual('hello')
           done()
         })
@@ -127,26 +134,26 @@ describe('Server', () => {
     })
 
     it('should close a peer when asked to', (done) => {
-      expect.assertions(1)
+      const { aliceId, bobId, key } = setup()
 
-      const localIntroductionPeer = makeIntroductionRequest(localId, key)
-      const remoteIntroductionPeer = makeIntroductionRequest(remoteId, key) // need to make request even if we don't use the result
+      const aliceRequest = requestIntroduction(aliceId, key)
+      const bobRequest = requestIntroduction(bobId, key) // need to make request even if we don't use the result
 
-      localIntroductionPeer.once(MESSAGE, (d) => {
-        const localPeer = new WebSocket(`${connectionUrl}/${localId}/${remoteId}/${key}`)
-        const remotePeer = new WebSocket(`${connectionUrl}/${remoteId}/${localId}/${key}`)
+      aliceRequest.once(MESSAGE, (d) => {
+        const alice = new WebSocket(`${url}/connection/${aliceId}/${bobId}/${key}`)
+        const bob = new WebSocket(`${url}/connection/${bobId}/${aliceId}/${key}`)
 
-        localPeer.once(OPEN, () => {
-          localPeer.send('DUDE!!')
+        alice.once(OPEN, () => {
+          alice.send('hey bob!')
           // close local after sending
-          localPeer.close()
+          alice.close()
         })
 
-        remotePeer.once(MESSAGE, (d) => {
-          expect(d).toEqual('DUDE!!')
+        bob.once(MESSAGE, (d) => {
+          expect(d).toEqual('hey bob!')
 
-          remotePeer.send('hello')
-          localPeer.once(MESSAGE, (d) => {
+          bob.send('sup alice')
+          alice.once(MESSAGE, (d) => {
             throw new Error('should never get here')
           })
           done()
@@ -157,17 +164,22 @@ describe('Server', () => {
 
   describe('N-way', () => {
     it('Should make introductions between all the peers', (done) => {
-      const instances = ['a', 'b', 'c', 'd', 'e']
-      const expectedIntroductions = factorial(instances.length) / factorial(instances.length - 2) // Permutations of 2
+      const { key } = setup()
+      const peers = ['a', 'b', 'c', 'd', 'e']
+      const expectedIntroductions = factorial(peers.length) / factorial(peers.length - 2) // Permutations of 2
+
       expect.assertions(expectedIntroductions)
-      const ids = instances.map((id) => `peer-${id}-${testId}`)
-      const introductionPeers = ids.map((d) => makeIntroductionRequest(d, key))
+
+      const ids = peers.map((id) => `peer-${id}-${testId}`)
+      const introductionRequests = ids.map((d) => requestIntroduction(d, key))
       let invitations = 0
-      introductionPeers.forEach((introductionPeer) => {
-        introductionPeer.on(MESSAGE, (data) => {
+
+      introductionRequests.forEach((peer) => {
+        peer.on(MESSAGE, (data) => {
           const introduction = JSON.parse(data.toString())
           expect(introduction.type).toBe('Introduction')
-          invitations++
+
+          invitations += 1
           if (invitations === expectedIntroductions) done()
         })
       })
