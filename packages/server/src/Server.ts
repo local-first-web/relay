@@ -59,8 +59,11 @@ export class Server extends EventEmitter {
 
   private sockets: Socket[] = []
 
+  private log: debug.Debugger
+
   constructor({ port = 8080 } = {}) {
     super()
+    this.log = debug(`lf:relay${port}`)
     this.port = port
     this.peers = {}
     this.keys = {}
@@ -71,6 +74,7 @@ export class Server extends EventEmitter {
   // DISCOVERY
 
   openIntroductionConnection(peer: WebSocket, id: ClientID) {
+    this.log('introduction connection', id)
     this.peers[id] = peer
 
     peer.on(MESSAGE, this.receiveIntroductionRequest(id))
@@ -100,10 +104,12 @@ export class Server extends EventEmitter {
         keys, // the key(s) both are interested in
       } as Message.Introduction
       if (this.peers[A]) this.peers[A].send(JSON.stringify(message))
+      else this.log(`Can't send connect message to unknown peer`, A)
     }
 
     return (data: Data) => {
       const message = JSON.parse(data.toString())
+      this.log('received introduction request %o', message)
 
       // honor join/leave requests
       const current = this.keys[A]
@@ -117,6 +123,7 @@ export class Server extends EventEmitter {
           // find keys that both peers are interested in
           const commonKeys = intersection(this.keys[A], this.keys[B])
           if (commonKeys.length > 0) {
+            this.log('notifying', A, B, commonKeys)
             sendIntroduction(A, B, commonKeys)
             sendIntroduction(B, A, commonKeys)
           }
@@ -144,6 +151,7 @@ export class Server extends EventEmitter {
 
     if (!this.holding[BseeksA]) {
       // We haven't heard from Bob yet; hold this connection
+      this.log('holding connection for peer', AseeksB)
 
       this.holding[AseeksB] = peerA // hold Alice's socket ready
       this.messages[AseeksB] = [] // hold any messages Alice sends to Bob in the meantime
@@ -160,6 +168,7 @@ export class Server extends EventEmitter {
       })
     } else {
       // We already have a connection request from Bob; hook them up
+      this.log('found peer, connecting', AseeksB)
 
       const peerB = this.holding[BseeksA]
 
@@ -181,23 +190,27 @@ export class Server extends EventEmitter {
     return new Promise<void>((resolve) => {
       // It's nice to be able to hit this server from a browser as a sanity check
       app.get('/', (req, res, next) => {
+        this.log('get /')
         res.send(logoPage)
         res.end()
       })
 
       // Introduction request
       app.ws('/introduction/:id', (ws, { params: { id } }) => {
+        this.log('received introduction request', id)
         this.openIntroductionConnection(ws as WebSocket, id)
       })
 
       // Connection request
       app.ws('/connection/:A/:B/:key', (ws, { params: { A, B, key } }) => {
+        this.log('received connection request', A, B)
         this.openConnection({ peerA: ws as WebSocket, A, B, key })
       })
 
       this.httpServer = app.listen(this.port, () => {
         const msg = `◆ Listening at http://localhost:${this.port}`
         if (!silent) console.log(msg)
+        this.log(msg)
         this.emit('ready')
         resolve()
       })
@@ -208,14 +221,14 @@ export class Server extends EventEmitter {
   close() {
     return new Promise<void>((resolve) => {
       if (this.httpServer) {
+        this.log('attempting httpServer.close')
         this.sockets.forEach((socket) => socket.destroy())
         this.httpServer.close(() => {
+          this.log('closed')
           this.emit(CLOSE)
           resolve()
         })
-      } else {
-        console.error('Relay.server: nothing to close')
-      }
+      } else this.log('nothing to close!')
     })
   }
 }
