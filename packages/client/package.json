@@ -12,7 +12,7 @@
     "test": "jest",
     "watch": "tsc --watch"
   },
-  "author": "",
+  "author": "herb@devresults.com",
   "dependencies": {
     "cuid": "2",
     "debug": "4",

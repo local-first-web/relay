@@ -1,7 +1,7 @@
-import * as WebSocket from 'ws'
+import { WebSocketDuplex } from 'websocket-stream'
 
 export type ConnectRequestParams = {
-  socket: WebSocket
+  socket: WebSocketDuplex
   A: ClientID
   B: ClientID
   key: DocumentID

@@ -3,16 +3,14 @@ import { EventEmitter } from 'events'
 import express from 'express'
 import expressWs from 'express-ws'
 import { Server as HttpServer, Socket } from 'net'
-import wsStream from 'websocket-stream'
-import { Data } from 'ws'
-import * as WebSocket from 'ws'
-import { CLOSE, MESSAGE } from './constants'
+import wsStream, { WebSocketDuplex } from 'websocket-stream'
 import { deduplicate } from './lib/deduplicate'
 import { intersection } from './lib/intersection'
 import { ClientID, ConnectRequestParams, DocumentID, Message } from './types'
 
 const { app } = expressWs(express())
 
+const options = { objectMode: true }
 const logoPage = `
   <body style="background:black; display:flex; justify-content:center; align-items:center">
     <img src="https://raw.githubusercontent.com/local-first-web/branding/main/svg/relay-v.svg" width="50%" alt="@localfirst/relay logo"/>
@@ -42,7 +40,7 @@ export class Server extends EventEmitter {
    * - `peer` is always a reference to a client's socket connection.
    * - `key` is always a document id (elsewhere referred to as a 'channel' or a 'discovery key'.
    */
-  public peers: Record<ClientID, WebSocket> = {}
+  public peers: Record<ClientID, WebSocketDuplex> = {}
   public keys: Record<ClientID, DocumentID[]> = {}
 
   /**
@@ -51,7 +49,7 @@ export class Server extends EventEmitter {
    * Bob, we temporarily store a reference to Alice's request in `holding`, and store any
    * messages from Bob in `messages`.
    */
-  private holding: Record<ClientID, { socket: WebSocket; messages: Data[] }> = {}
+  private holding: Record<ClientID, { socket: WebSocketDuplex; messages: any[] }> = {}
 
   /**
    * Keep these references for cleanup
@@ -76,13 +74,15 @@ export class Server extends EventEmitter {
     // Introduction request
     app.ws('/introduction/:id', (ws, { params: { id } }) => {
       this.log('received introduction request', id)
-      this.openIntroductionConnection(ws, id)
+      //@ts-ignore
+      this.openIntroductionConnection(wsStream(ws, options), id)
     })
 
     // Connection request
     app.ws('/connection/:A/:B/:key', (ws, { params: { A, B, key } }) => {
       this.log('received connection request', A, B)
-      this.openConnection({ socket: ws, A, B, key })
+      //@ts-ignore
+      this.openConnection({ socket: wsStream(ws, options), A, B, key })
     })
 
     return (this.httpServer = app
@@ -99,23 +99,23 @@ export class Server extends EventEmitter {
     this.httpSockets.forEach((socket) => socket.destroy())
     return this.httpServer?.close(() => {
       this.log('closed')
-      this.emit(CLOSE)
+      this.emit('close')
     })
   }
 
   // DISCOVERY
 
-  private openIntroductionConnection(socket: WebSocket, id: ClientID) {
+  private openIntroductionConnection(socket: WebSocketDuplex, id: ClientID) {
     this.log('introduction connection', id)
     this.peers[id] = socket
 
-    socket.on(MESSAGE, this.handleIntroductionRequest(id))
-    socket.on(CLOSE, this.closeIntroductionConnection(id))
+    socket.on('data', this.handleIntroductionRequest(id))
+    socket.on('close', this.closeIntroductionConnection(id))
 
     this.emit('introductionConnection', id)
   }
 
-  private handleIntroductionRequest = (id: ClientID) => (data: Data) => {
+  private handleIntroductionRequest = (id: ClientID) => (data: any) => {
     const A = id // A and B always refer to peer ids
     const message = JSON.parse(data.toString()) as Message.Join
     this.log('received introduction request %o', message)
@@ -149,7 +149,7 @@ export class Server extends EventEmitter {
       id: B, // the id of the other peer
       keys, // the key(s) both are interested in
     }
-    this.peers[A]?.send(JSON.stringify(message))
+    this.peers[A]?.write(JSON.stringify(message))
   }
 
   private closeIntroductionConnection = (id: ClientID) => () => {
@@ -159,7 +159,8 @@ export class Server extends EventEmitter {
 
   // PEER CONNECTIONS
 
-  private openConnection({ socket: socketA, A, B, key }: ConnectRequestParams) {
+  private openConnection({ socket, A, B, key }: ConnectRequestParams) {
+    const socketA = socket
     // A and B always refer to peers' client ids.
 
     // These are string keys for identifying this request and the reciprocal request
@@ -172,21 +173,17 @@ export class Server extends EventEmitter {
     if (this.holding[BseeksA]) {
       // We already have a connection request from Bob; hook them up
       this.log('found peer, connecting', AseeksB)
+
       const { socket: socketB, messages } = this.holding[BseeksA]
 
       // Send any stored messages
-      messages.forEach((message) => socketA.send(message))
+      messages.forEach((message) => socketA.write(message))
 
       // Pipe the two sockets together
-
-      const aStream = wsStream(socketA)
-      const bStream = wsStream(socketB)
-
-      aStream.pipe(bStream)
-      bStream.pipe(aStream)
+      socketA.pipe(socketB).pipe(socketA)
 
       // Don't need to hold the connection or messages any more
-      socketA.removeListener(MESSAGE, holdMessage)
+      socketA.removeListener('data', holdMessage)
       delete this.holding[BseeksA]
     } else {
       // We haven't heard from Bob yet; hold this connection
@@ -196,10 +193,10 @@ export class Server extends EventEmitter {
       this.holding[AseeksB] = { socket: socketA, messages: [] }
 
       // hold on to incoming message from Alice for Bob
-      socketA.on(MESSAGE, holdMessage)
+      socketA.on('data', holdMessage)
 
       // clean up
-      socketA.on(CLOSE, () => delete this.holding[AseeksB])
+      socketA.on('close', () => delete this.holding[AseeksB])
     }
   }
 }
