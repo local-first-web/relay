@@ -54,14 +54,10 @@ export class Server extends EventEmitter {
   private holding: Record<ClientID, { socket: WebSocket; messages: Data[] }> = {}
 
   /**
-   * When we start listening, we keep a reference to the `httpServer` so we can close it if asked to.
+   * Keep these references for cleanup
    */
   private httpServer?: HttpServer
-
-  /**
-   * HTTP sockets, tracking for cleanup
-   */
-  private sockets: Socket[] = []
+  private httpSockets: Socket[] = []
 
   private log: debug.Debugger
 
@@ -74,46 +70,36 @@ export class Server extends EventEmitter {
   // SERVER
 
   listen({ silent = false }: ListenOptions = {}) {
-    return new Promise<void>((resolve) => {
-      // Allow hitting this server from a browser as a sanity check
-      app.get('/', (_, res) => res.send(logoPage).end())
+    // Allow hitting this server from a browser as a sanity check
+    app.get('/', (_, res) => res.send(logoPage).end())
 
-      // Introduction request
-      app.ws('/introduction/:id', (ws, { params: { id } }) => {
-        this.log('received introduction request', id)
-        this.openIntroductionConnection(ws, id)
-      })
-
-      // Connection request
-      app.ws('/connection/:A/:B/:key', (ws, { params: { A, B, key } }) => {
-        this.log('received connection request', A, B)
-        this.openConnection({ socket: ws, A, B, key })
-      })
-
-      this.httpServer = app
-        .listen(this.port, () => {
-          const msg = `◆ Listening at http://localhost:${this.port}`
-          if (!silent) console.log(msg)
-          this.log(msg)
-          this.emit('ready')
-          resolve()
-        })
-        // keep track of sockets for cleanup
-        .on('connection', (socket) => this.sockets.push(socket))
+    // Introduction request
+    app.ws('/introduction/:id', (ws, { params: { id } }) => {
+      this.log('received introduction request', id)
+      this.openIntroductionConnection(ws, id)
     })
+
+    // Connection request
+    app.ws('/connection/:A/:B/:key', (ws, { params: { A, B, key } }) => {
+      this.log('received connection request', A, B)
+      this.openConnection({ socket: ws, A, B, key })
+    })
+
+    return (this.httpServer = app
+      .listen(this.port, () => {
+        if (!silent) console.log(`◆ Listening at http://localhost:${this.port}`)
+        this.emit('ready')
+      })
+      // keep track of sockets for cleanup
+      .on('connection', (socket) => this.httpSockets.push(socket)))
   }
 
   close() {
-    return new Promise<void>((resolve) => {
-      if (this.httpServer) {
-        this.log('attempting httpServer.close')
-        this.sockets.forEach((socket) => socket.destroy())
-        this.httpServer.close(() => {
-          this.log('closed')
-          this.emit(CLOSE)
-          resolve()
-        })
-      } else this.log('nothing to close!')
+    this.log('attempting httpServer.close')
+    this.httpSockets.forEach((socket) => socket.destroy())
+    return this.httpServer?.close(() => {
+      this.log('closed')
+      this.emit(CLOSE)
     })
   }
 
