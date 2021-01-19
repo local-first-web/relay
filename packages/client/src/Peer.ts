@@ -6,7 +6,7 @@ import { PeerOptions } from './types'
 /**
  * The Peer class holds one or more sockets, one per key (aka discoveryKey aka channel).
  * It's not exported from the package and should be treated as private - consumers can
- * get the appropriate port from
+ * get the appropriate port from the id that is emitted
  */
 export class Peer extends EventEmitter {
   id: string
@@ -42,6 +42,12 @@ export class Peer extends EventEmitter {
       socket.end()
       socket.destroy()
       this.sockets.delete(key)
+    }
+  }
+
+  disconnect() {
+    for (const key in this.sockets) {
+      this.remove(key)
     }
   }
 }
