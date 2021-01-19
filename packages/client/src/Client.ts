@@ -1,6 +1,6 @@
 import debug, { Debugger } from 'debug'
 import { EventEmitter } from 'events'
-import { WebSocketDuplex } from 'websocket-stream'
+import wsStream, { WebSocketDuplex } from 'websocket-stream'
 import { CLOSE, OPEN, PEER } from './constants'
 import { newid } from './newid'
 
@@ -27,16 +27,14 @@ const backoffCoeff = 1.5 + Math.random() * 0.1
  * ```ts
  * client = new Client({ id: 'my-peer-id', url })
  * client.join('my-document-id')
- * client.on(peer, (peer, key) => {
- *   const socket = peer.get(key) // `socket` is a WebSocket instance
- *
+ * client.on('peer', ({key, id, socket}) => {
  *   // send a message
- *   socket.send('Hello!')
+ *   socket.write('Hello!')
  *
  *   // listen for messages
- *   socket.onmessage = () => {
-//  *     console.log(messsage)
- *   }
+ *   socket.on('data', () => {
+ *     console.log(messsage)
+ *   })
  * })
  * ```
  */
@@ -44,7 +42,7 @@ export class Client extends EventEmitter {
   public id: string
   public url: string
   public keys: Set<string> = new Set()
-  public serverConnection: WebSocket
+  public serverConnection: WebSocketDuplex
 
   private peers: Map<string, Peer> = new Map()
   private retryDelay: number
@@ -53,11 +51,11 @@ export class Client extends EventEmitter {
 
   /**
    * @param id a string that identifies you uniquely, defaults to a UUID
-   * @param url the url of  the `relay`, e.g. `http://signal.mydomain.com`
+   * @param url the url of the `relay`, e.g. `http://myrelay.mydomain.com`
    */
   constructor({ id = newid(), url }: ClientOptions) {
     super()
-    this.log = debug(`lf:relay-client:${id}`)
+    this.log = debug(`lf:relay:client:${id}`)
 
     this.id = id
     this.url = url
@@ -70,13 +68,25 @@ export class Client extends EventEmitter {
   // introduction message, inviting you to connect.
   join(key: string) {
     this.log('joining', key)
-
     this.keys.add(key)
+    this.sendToServer({ type: 'Join', join: [key] })
+  }
 
-    this.sendToServer({
-      type: 'Join',
-      join: [key],
-    })
+  leave(key: string) {
+    this.log('leaving', key)
+    this.keys.delete(key)
+    this.peers.forEach((peer) => peer.remove(key))
+    this.sendToServer({ type: 'Leave', leave: [key] })
+  }
+
+  disconnect(id?: string) {
+    if (id) {
+      // disconnect from this peer
+      this.peers.get(id).disconnect()
+    } else {
+      // disconnect from all peers
+      this.peers.forEach((peer) => peer.disconnect())
+    }
   }
 
   getSocket(id: string, key: string) {
@@ -85,54 +95,44 @@ export class Client extends EventEmitter {
 
   ////// PRIVATE
 
-  private connectToServer(): WebSocket {
+  private connectToServer(): WebSocketDuplex {
     const url = `${this.url}/introduction/${this.id}`
-
     this.log('connecting to signal server', url)
 
-    this.serverConnection = new WebSocket(url)
+    return wsStream(url)
+      .on('open', () => {
+        // successful connection - reset retry delay
+        this.retryDelay = initialRetryDelay
 
-    const onopen = () => {
-      // successful connection - reset retry delay
-      this.retryDelay = initialRetryDelay
-
-      this.sendToServer({
-        type: 'Join',
-        join: [...this.keys],
+        this.sendToServer({
+          type: 'Join',
+          join: [...this.keys],
+        })
+        this.emit(OPEN)
       })
-      this.emit(OPEN)
-    }
-    this.serverConnection.onopen = onopen.bind(this)
 
-    const onclose = () => {
-      this.retryDelay *= backoffCoeff
-      const retryDelaySeconds = Math.floor(this.retryDelay / 1000)
-      this.log(`signal server connection closed... retrying in ${retryDelaySeconds}s`)
-      setTimeout(() => this.connectToServer(), this.retryDelay)
-      this.emit(CLOSE)
-    }
-    this.serverConnection.onclose = onclose.bind(this)
+      .on('close', () => {
+        this.retryDelay *= backoffCoeff
+        const retryDelaySeconds = Math.floor(this.retryDelay / 1000)
+        this.log(`signal server connection closed... retrying in ${retryDelaySeconds}s`)
+        setTimeout(() => this.connectToServer(), this.retryDelay)
+        this.emit(CLOSE)
+      })
 
-    const onmessage = ({ data }: { data: string }) => {
-      this.log('message from signal server', data)
-      const message = JSON.parse(data.toString()) as Message.ServerToClient
-      this.receiveFromServer(message)
-    }
-    this.serverConnection.onmessage = onmessage.bind(this)
+      .on('data', (data: string) => {
+        this.log('message from signal server', data)
+        const message = JSON.parse(data.toString()) as Message.ServerToClient
+        this.receiveFromServer(message)
+      })
 
-    const onerror = (args: any) => {
-      this.log('signal server error', args)
-    }
-    this.serverConnection.onerror = onerror.bind(this)
-
-    return this.serverConnection
+      .on('error', (args: any) => {
+        this.log('signal server error', args)
+      })
   }
 
   private sendToServer(msg: Message.ClientToServer) {
-    if (this.serverConnection.readyState === WebSocket.OPEN) {
-      this.log('sending to server %o', msg)
-      this.serverConnection.send(JSON.stringify(msg))
-    }
+    this.log('sending to server %o', msg)
+    this.serverConnection.write(JSON.stringify(msg))
   }
 
   // The only kind of message that we receive from the signal server is an introduction, which tells
@@ -153,7 +153,9 @@ export class Client extends EventEmitter {
           peer.on(OPEN, (peerKey) => {
             this.log('found peer', id, peerKey)
             const socket = peer.get(key)
-            this.emit(PEER, { key, id, socket } as PeerEventPayload)
+            const payload: PeerEventPayload = { key, id, socket }
+            this.log('emitting peer', payload)
+            this.emit(PEER, payload)
           })
           peer.add(key)
         })
