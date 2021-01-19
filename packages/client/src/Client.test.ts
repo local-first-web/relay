@@ -4,7 +4,7 @@ import { getPortPromise as getAvailablePort } from 'portfinder'
 import { Client, PeerEventPayload } from './Client'
 import { PEER } from './constants'
 
-describe('Client', () => {
+describe('client', () => {
   const log = debug('lf:relay-client:tests')
   let port: number
   let url: string
@@ -21,7 +21,7 @@ describe('Client', () => {
     url = `ws://localhost:${port}`
 
     server = new Server({ port })
-    await server.listen({ silent: true })
+    server.listen({ silent: true })
   })
 
   beforeEach(() => {
@@ -32,68 +32,70 @@ describe('Client', () => {
     log(`TEST ${testId}`)
   })
 
-  afterEach(() => {})
-
   afterAll(() => {
     server.close()
   })
 
-  describe('Initialization', () => {
-    let client: Client
-
-    it('should connect to the discovery server', () => {
-      client = new Client({ id: aliceId, url })
-      expect(client.serverConnection.url).toContain(`ws://localhost:${port}/introduction/alice`)
-    })
-  })
-
-  describe('Join', () => {
-    let alice: Client
-    let bob: Client
-
-    it('should connect to a peer', async () => {
-      alice = new Client({ id: aliceId, url })
-      bob = new Client({ id: bobId, url })
+  describe('connections', () => {
+    const setup = () => {
+      const alice = new Client({ id: aliceId, url })
+      const bob = new Client({ id: bobId, url })
 
       alice.join(key)
       bob.join(key)
+      return { alice, bob }
+    }
 
-      await Promise.all([
-        new Promise<void>((resolve) => {
-          alice.on(PEER, ({ id }: PeerEventPayload) => {
-            expect(id).toEqual(bobId)
-            resolve()
-          })
-        }),
-        new Promise<void>((resolve) => {
-          bob.on(PEER, ({ id }: PeerEventPayload) => {
-            expect(id).toEqual(aliceId)
-            resolve()
-          })
-        }),
-      ])
-    })
-  })
+    describe.only('join', () => {
+      it('should connect to a peer', async () => {
+        const { alice, bob } = setup()
 
-  describe('Send/Receive', () => {
-    let alice: Client
-    let bob: Client
-
-    it('should send a message to a remote peer', (done) => {
-      alice = new Client({ id: aliceId, url })
-      bob = new Client({ id: bobId, url })
-
-      alice.join(key)
-      bob.join(key)
-
-      alice.on(PEER, ({ socket }: PeerEventPayload) => {
-        socket.write('hello')
+        await Promise.all([
+          new Promise<void>((resolve) => {
+            alice.on(PEER, ({ id }: PeerEventPayload) => {
+              expect(id).toEqual(bobId)
+              resolve()
+            })
+          }),
+          new Promise<void>((resolve) => {
+            bob.on(PEER, ({ id }: PeerEventPayload) => {
+              expect(id).toEqual(aliceId)
+              resolve()
+            })
+          }),
+        ])
       })
+    })
 
-      bob.on(PEER, ({ socket }: PeerEventPayload) => {
-        socket.on('data', (data) => {
-          expect(data.toString()).toEqual('hello')
-          done()
+    describe('leave', () => {
+      it('should ', () => {})
+    })
+
+    describe('disconnect from one', () => {
+      it('should ', () => {})
+    })
+
+    describe('disconnect from all', () => {
+      it('should ', () => {})
+    })
+
+    describe('disconnect then reconnect', () => {
+      it('should ', () => {})
+    })
+
+    describe('send/receive', () => {
+      it('should send a message to a remote peer', (done) => {
+        const { alice, bob } = setup()
+
+        alice.on(PEER, ({ socket }: PeerEventPayload) => {
+          socket.write('hello')
+        })
+
+        bob.on(PEER, ({ socket }: PeerEventPayload) => {
+          socket.on('data', (data) => {
+            expect(data.toString()).toEqual('hello')
+            done()
+          })
         })
       })
     })
