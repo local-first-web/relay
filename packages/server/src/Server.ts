@@ -122,9 +122,9 @@ export class Server extends EventEmitter {
 
     // An introduction request from the client will include a list of keys to join.
     // We combine those keys with any we already have and deduplicate.
-    const { join = [] } = message
+    const { keys } = message
     const current = this.keys[A] ?? []
-    this.keys[A] = current.concat(join).reduce(deduplicate, [])
+    this.keys[A] = current.concat(keys).reduce(deduplicate, [])
 
     // if this peer (A) has interests in common with any existing peer (B), introduce them to each other
     for (const B in this.peers) {

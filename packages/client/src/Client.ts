@@ -1,3 +1,4 @@
+import { DocumentID } from '@localfirst/relay/dist/types'
 import debug, { Debugger } from 'debug'
 import { EventEmitter } from 'events'
 import wsStream, { WebSocketDuplex } from 'websocket-stream'
@@ -5,10 +6,11 @@ import { CLOSE, OPEN, PEER } from './constants'
 import { newid } from './newid'
 
 import { Peer } from './Peer'
-import { ClientOptions, Message } from './types'
+import { ClientID, ClientOptions, Message } from './types'
 
-const initialRetryDelay = 1000
+const initialRetryDelay = 100
 const backoffCoeff = 1.5 + Math.random() * 0.1
+const maxRetryDelay = 30000
 
 /**
  * This is a client for `relay` that makes it easier to interact with it.
@@ -66,17 +68,17 @@ export class Client extends EventEmitter {
   // Joining a key (discoveryKey) lets the server know that you're interested in it, and if there are
   // other peers who have joined the same key, you and the remote peer will both receive an
   // introduction message, inviting you to connect.
-  join(key: string) {
+  join(key: DocumentID) {
     this.log('joining', key)
     this.keys.add(key)
-    this.sendToServer({ type: 'Join', join: [key] })
+    this.sendToServer({ type: 'Join', keys: [key] })
   }
 
-  leave(key: string) {
+  leave(key: DocumentID) {
     this.log('leaving', key)
     this.keys.delete(key)
     this.peers.forEach((peer) => peer.remove(key))
-    this.sendToServer({ type: 'Leave', leave: [key] })
+    this.sendToServer({ type: 'Leave', keys: [key] })
   }
 
   disconnect(id?: string) {
@@ -106,27 +108,48 @@ export class Client extends EventEmitter {
 
         this.sendToServer({
           type: 'Join',
-          join: [...this.keys],
+          keys: Array.from(this.keys),
         })
         this.emit(OPEN)
       })
 
       .on('close', () => {
-        this.retryDelay *= backoffCoeff
-        const retryDelaySeconds = Math.floor(this.retryDelay / 1000)
-        this.log(`signal server connection closed... retrying in ${retryDelaySeconds}s`)
+        if (this.retryDelay < maxRetryDelay) this.retryDelay *= backoffCoeff
+        this.log(`Relay connection closed. Retrying in ${Math.floor(this.retryDelay / 1000)}s`)
         setTimeout(() => this.connectToServer(), this.retryDelay)
         this.emit(CLOSE)
       })
 
       .on('data', (data: string) => {
         this.log('message from signal server', data)
-        const message = JSON.parse(data.toString()) as Message.ServerToClient
-        this.receiveFromServer(message)
+        const msg = JSON.parse(data.toString()) as Message.ServerToClient
+
+        // The only kind of message that we receive from the relay server is an introduction, which tells
+        // us that someone else is interested in the same thing we are. When we receive that message, we
+        // automatically try to connect "directly" to the peer (via piped sockets on the signaling server).
+        switch (msg.type) {
+          case 'Introduction':
+            const { id, keys = [] } = msg
+
+            // use existing connection, or connect to peer
+            const peer = this.peers.get(id) ?? this.connectToPeer(id)
+
+            // identify any keys for which we don't already have a connection to this peer
+            const newKeys = keys.filter((key) => !peer.has(key))
+            newKeys.forEach((key) => {
+              peer.on(OPEN, ({ id, key, socket }) => {
+                this.emit(PEER, { key, id, socket })
+              })
+              peer.add(key)
+            })
+            break
+          default:
+            throw new Error(`Invalid message type '${msg.type}'`)
+        }
       })
 
       .on('error', (args: any) => {
-        this.log('signal server error', args)
+        this.log('error', args)
       })
   }
 
@@ -135,37 +158,7 @@ export class Client extends EventEmitter {
     this.serverConnection.write(JSON.stringify(msg))
   }
 
-  // The only kind of message that we receive from the signal server is an introduction, which tells
-  // us that someone else is interested in the same thing we are. When we receive that message, we
-  // automatically try to connect "directly" to the peer (via piped sockets on the signaling server).
-  private receiveFromServer(msg: Message.ServerToClient) {
-    this.log('received from signal server %o', msg)
-    switch (msg.type) {
-      case 'Introduction':
-        const { id, keys = [] } = msg
-
-        // use existing connection, or connect to peer
-        const peer = this.peers.get(id) ?? this.connectToPeer(id)
-
-        // identify any keys for which we don't already have a connection to this peer
-        const newKeys = keys.filter((key) => !peer.has(key))
-        newKeys.forEach((key) => {
-          peer.on(OPEN, (peerKey) => {
-            this.log('found peer', id, peerKey)
-            const socket = peer.get(key)
-            const payload: PeerEventPayload = { key, id, socket }
-            this.log('emitting peer', payload)
-            this.emit(PEER, payload)
-          })
-          peer.add(key)
-        })
-        break
-      default:
-        throw new Error(`Invalid message type '${msg.type}'`)
-    }
-  }
-
-  private connectToPeer(id: string): Peer {
+  private connectToPeer(id: ClientID): Peer {
     this.log('requesting direct connection to peer', id)
     const url = `${this.url}/connection/${this.id}` // remaining parameters are added by peer
     const peer = new Peer({ url, id })
@@ -179,7 +172,7 @@ export class Client extends EventEmitter {
 EventEmitter.defaultMaxListeners = 500
 
 export interface PeerEventPayload {
-  key: string
-  id: string
+  key: DocumentID
+  id: ClientID
   socket: WebSocketDuplex
 }

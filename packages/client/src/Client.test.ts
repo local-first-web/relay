@@ -46,7 +46,7 @@ describe('client', () => {
       return { alice, bob }
     }
 
-    describe.only('join', () => {
+    describe('join', () => {
       it('should connect to a peer', async () => {
         const { alice, bob } = setup()
 

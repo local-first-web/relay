@@ -6,7 +6,7 @@ import { PeerOptions } from './types'
 /**
  * The Peer class holds one or more sockets, one per key (aka discoveryKey aka channel).
  * It's not exported from the package and should be treated as private - consumers can
- * get the appropriate port from the id that is emitted
+ * get the socket from the 'peer' event payload.
  */
 export class Peer extends EventEmitter {
   id: string
@@ -24,7 +24,7 @@ export class Peer extends EventEmitter {
     if (!this.sockets.has(key)) {
       const socket = wsStream(`${this.url}/${this.id}/${key}`)
       this.sockets.set(key, socket)
-      this.emit(OPEN, key)
+      this.emit(OPEN, { id: this.id, key, socket })
     }
   }
 

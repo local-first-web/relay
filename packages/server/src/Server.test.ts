@@ -1,6 +1,7 @@
 import wsStream, { WebSocketDuplex } from 'websocket-stream'
 import { Server } from './Server'
 import { getPortPromise as getAvailablePort } from 'portfinder'
+import { Message } from 'types'
 
 // const log = debug('lf:relay:tests')
 
@@ -39,10 +40,9 @@ describe('Server', () => {
 
   const requestIntroduction = (id: string, key: string) => {
     const peer = wsStream(`${url}/introduction/${id}`)
-    const joinMessage = {
+    const joinMessage: Message.Join = {
       type: 'Join',
-      id,
-      join: [key],
+      keys: [key],
     }
     peer.write(JSON.stringify(joinMessage))
     return peer
@@ -173,7 +173,7 @@ describe('Server', () => {
       const ids = peers.map((id) => `peer-${id}-${testId}`)
       const sockets = ids.map((id: string) => wsStream(`${url}/introduction/${id}`))
 
-      sockets.forEach((socket: WebSocketDuplex, i: number) => {
+      sockets.forEach((socket: WebSocketDuplex) => {
         socket.on('data', (data) => {
           try {
             const message = JSON.parse(data.toString())
@@ -185,9 +185,8 @@ describe('Server', () => {
           if (introductions === expectedIntroductions) done()
         })
       })
-      sockets.forEach(async (socket: WebSocketDuplex, i: number) => {
-        const id = ids[i]
-        const joinMessage = { type: 'Join', id, join: [key] }
+      sockets.forEach(async (socket: WebSocketDuplex) => {
+        const joinMessage = { type: 'Join', keys: [key] }
         socket.write(JSON.stringify(joinMessage))
       })
     })
