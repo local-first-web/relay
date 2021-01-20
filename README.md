@@ -180,7 +180,7 @@ MIT
 
 Inspired by https://github.com/orionz/discovery-cloud-server
 
-Formerly part of 🐟 Cevitxe (now [@localfirst/state])
+Formerly known as 🐟 Cevitxe Signal Server. (Cevitxe is now [@localfirst/state])
 
 [@localfirst/state]: https://github.com/local-first-web/state
 [@localfirst/auth]: https://github.com/local-first-web/auth
