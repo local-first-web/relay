@@ -1,4 +1,4 @@
-import { DocumentID } from '../types'
+import { DocumentId } from '../types'
 
-export const deduplicate = (acc: DocumentID[], key: string) =>
+export const deduplicate = (acc: DocumentId[], key: string) =>
   acc.includes(key) ? acc : acc.concat(key)
