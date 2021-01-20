@@ -108,7 +108,7 @@ describe('client', () => {
         alice.disconnect()
         await allDisconnected(alice, bob)
 
-        // Alice and Bob are disconnectred
+        // Alice and Bob are disconnected
         expect(alice.has(bob.userName, documentId)).toBe(false)
         expect(bob.has(alice.userName, documentId)).toBe(false)
 
@@ -123,7 +123,7 @@ describe('client', () => {
     })
 
     describe('send/receive', () => {
-      it('should send a message to a remote peer', async done => {
+      it('sends a message to a remote peer', async done => {
         const { alice, bob } = setup()
 
         alice.on('peer.connect', ({ socket }: PeerEventPayload) => {

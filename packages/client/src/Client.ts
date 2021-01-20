@@ -7,10 +7,6 @@ import { newid } from './newid'
 
 import { UserName, Message } from '@localfirst/relay'
 
-const initialRetryDelay = 100
-const backoffCoeff = 1.5 + Math.random() * 0.1
-const maxRetryDelay = 30000
-
 type PeerSocketMap = Map<DocumentId, WebSocketDuplex>
 
 /**
@@ -24,16 +20,16 @@ type PeerSocketMap = Map<DocumentId, WebSocketDuplex>
  *
  * ```ts
  * client = new Client({ userName: 'my-peer-userName', url })
- * client.join('my-document-userName')
- * client.on('peer', ({documentId, userName, socket}) => {
- *   // send a message
- *   socket.write('Hello!')
+ *   .join('my-document-userName')
+ *   .on('peer.connect', ({documentId, userName, socket}) => {
+ *     // send a message
+ *     socket.write('Hello!')
  *
- *   // listen for messages
- *   socket.on('data', () => {
- *     console.log(messsage)
+ *     // listen for messages
+ *     socket.on('data', () => {
+ *       console.log(messsage)
+ *     })
  *   })
- * })
  * ```
  */
 export class Client extends EventEmitter {
@@ -44,24 +40,43 @@ export class Client extends EventEmitter {
 
   /** All the DocumentIds we're interested in */
   public documentIds: Set<DocumentId> = new Set()
+
+  /** All the peers we're connected to.
+   * (A 'peer' in this case is actually just a bunch of sockets -
+   * one per documentId that we have in common.) */
   public peers: Map<UserName, PeerSocketMap> = new Map()
 
   private serverConnection: WebSocketDuplex
   private retryDelay: number
 
   log: Debugger
+  minRetryDelay: number
+  maxRetryDelay: number
+  backoffFactor: number
 
   /**
    * @param userName a string that identifies you uniquely, defaults to a UUID
    * @param url the url of the `relay`, e.g. `http://myrelay.mydomain.com`
    */
-  constructor({ userName = newid(), url, documentIds = [] }: ClientOptions) {
+  constructor({
+    userName = newid(),
+    url,
+    documentIds = [],
+    minRetryDelay = 100,
+    backoffFactor = 1.5,
+    maxRetryDelay = 30000,
+  }: ClientOptions) {
     super()
     this.log = debug(`lf:relay:client:${userName}`)
 
     this.userName = userName
     this.url = url
-    this.retryDelay = initialRetryDelay
+
+    this.minRetryDelay = minRetryDelay
+    this.maxRetryDelay = maxRetryDelay
+    this.backoffFactor = backoffFactor
+
+    this.retryDelay = minRetryDelay
 
     this.connectToServer(documentIds)
   }
@@ -76,6 +91,7 @@ export class Client extends EventEmitter {
     this.log('joining', documentId)
     this.documentIds.add(documentId)
     this.sendToServer({ type: 'Join', documentIds: [documentId] })
+    return this
   }
 
   /**
@@ -89,15 +105,18 @@ export class Client extends EventEmitter {
       this.removeSocket(userName, documentId)
     }
     this.sendToServer({ type: 'Leave', documentIds: [documentId] })
+    return this
   }
 
   /**
    * Disconnects from one or all peers
-   * @param userName Name of the peer to disconnect. If none is provided, we disconnect all peers.
+   * @param peerUserName Name of the peer to disconnect. If none is provided, we disconnect all peers.
    */
-  public disconnect(userName?: UserName) {
-    const peersToDisconnect = userName
-      ? [userName] // just this one
+  public disconnect(peerUserName?: UserName) {
+    this.log(`disconnecting from ${peerUserName ?? 'all peers'}`)
+
+    const peersToDisconnect = peerUserName
+      ? [peerUserName] // just this one
       : Array.from(this.peers.keys()) // all of them
 
     for (const userName of peersToDisconnect) {
@@ -106,14 +125,16 @@ export class Client extends EventEmitter {
         this.removeSocket(userName, documentId)
       }
     }
+
+    return this
   }
 
-  public has(userName: UserName, documentId: DocumentId) {
-    return this.peers.has(userName) && this.peers.get(userName).has(documentId)
+  public has(peerUserName: UserName, documentId: DocumentId) {
+    return this.peers.has(peerUserName) && this.peers.get(peerUserName).has(documentId)
   }
 
-  public get(userName: UserName, documentId: DocumentId) {
-    return this.peers.get(userName)?.get(documentId)
+  public get(peerUserName: UserName, documentId: DocumentId) {
+    return this.peers.get(peerUserName)?.get(documentId)
   }
 
   ////// PRIVATE
@@ -124,46 +145,47 @@ export class Client extends EventEmitter {
 
     this.serverConnection = wsStream(url)
       .on('data', (data: any) => {
-        this.log('message from signal server', data)
-        const msg = JSON.parse(data.toString()) as Message.ServerToClient
-        this.receiveFromServer(msg)
+        const message = JSON.parse(data.toString()) as Message.ServerToClient
+        this.receiveFromServer(message)
       })
-      .on('close', () => {
-        // try to reconnect after a delay
-        if (this.retryDelay < maxRetryDelay) this.retryDelay *= backoffCoeff
-        const retryDelaySeconds = Math.floor(this.retryDelay / 1000)
-        this.log(`Relay connection closed. Retrying in ${retryDelaySeconds}s`)
-        setTimeout(() => this.connectToServer(documentIds), this.retryDelay)
 
+      .on('close', () => {
+        this.tryToReconnect(documentIds)
         this.emit('server.disconnect')
       })
+
       .on('error', (args: any) => {
         this.log('error', args)
         this.emit('error', args)
       })
 
-    this.retryDelay = initialRetryDelay
+    this.retryDelay = this.minRetryDelay
     documentIds.forEach(documentId => this.join(documentId))
     this.emit('server.connect')
   }
 
-  private sendToServer(msg: Message.ClientToServer) {
-    this.log('sending to server %o', msg)
-    this.serverConnection.write(JSON.stringify(msg))
+  private tryToReconnect(documentIds: string[]) {
+    setTimeout(() => this.connectToServer(documentIds), this.retryDelay)
+    if (this.retryDelay < this.maxRetryDelay)
+      this.retryDelay *= this.backoffFactor + Math.random() * 0.1 - 0.05 // randomly vary the delay
+
+    const retryDelaySeconds = Math.floor(this.retryDelay / 1000)
+    this.log(`Relay connection closed. Retrying in ${retryDelaySeconds}s`)
   }
 
-  private receiveFromServer(msg: Message.ServerToClient) {
+  private sendToServer(message: Message.ClientToServer) {
+    this.log('sending to server %o', message)
+    this.serverConnection.write(JSON.stringify(message))
+  }
+
+  private receiveFromServer(message: Message.ServerToClient) {
+    if (message.type !== 'Introduction') throw new Error(`Invalid message type '${message.type}'`)
+
     // The only kind of message that we receive from the relay server is an introduction, which tells
     // us that someone else is interested in the same thing we are. When we receive that message, we
     // automatically try to connect "directly" to the peer (via piped sockets on the signaling server).
-    switch (msg.type) {
-      case 'Introduction':
-        const { userName, documentIds = [] } = msg
-        this.addPeer(userName, documentIds)
-        break
-      default:
-        throw new Error(`Invalid message type '${msg.type}'`)
-    }
+    const { userName, documentIds = [] } = message
+    this.addPeer(userName, documentIds)
   }
 
   private getPeer(userName: UserName) {
@@ -177,25 +199,27 @@ export class Client extends EventEmitter {
 
   private addSocket(userName: UserName, documentId: DocumentId) {
     const peer = this.getPeer(userName)
-    if (!peer.has(documentId)) {
-      const url = `${this.url}/connection/${this.userName}/${userName}/${documentId}`
-      const socket = wsStream(url) //
-        .on('close', () => {
-          this.removeSocket(userName, documentId)
-          this.emit('peer.disconnect', { userName, documentId })
-        })
-      peer.set(documentId, socket)
-      this.emit('peer.connect', { userName, documentId, socket })
-    }
+    if (peer.has(documentId)) return // don't add twice
+
+    const socket = wsStream(`${this.url}/connection/${this.userName}/${userName}/${documentId}`)
+
+    // if the other end disconnects, we disconnect
+    socket.on('close', () => {
+      this.emit('peer.disconnect', { userName, documentId })
+      this.removeSocket(userName, documentId)
+    })
+
+    peer.set(documentId, socket)
+    this.emit('peer.connect', { userName, documentId, socket })
   }
 
   private removeSocket(userName: UserName, documentId: DocumentId) {
     const peer = this.getPeer(userName)
-    if (peer.has(documentId)) {
-      const socket = peer.get(documentId)
-      socket.destroy()
-      peer.delete(documentId)
-    }
+    if (!peer.has(documentId)) return // can't remove twice
+
+    const socket = peer.get(documentId)
+    socket.destroy()
+    peer.delete(documentId)
   }
 }
 
@@ -214,6 +238,10 @@ export interface ClientOptions {
 
   /** DocumentId(s) to join immediately */
   documentIds?: DocumentId[]
+
+  minRetryDelay?: number
+  maxRetryDelay?: number
+  backoffFactor?: number
 }
 
 // It's normal for a document with a lot of participants to have a lot of connections, so increase
