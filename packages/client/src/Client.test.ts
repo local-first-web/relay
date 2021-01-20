@@ -26,14 +26,11 @@ describe('client', () => {
     const setup = () => {
       testId += 1
       const documentId = `test-documentId-${testId}`
+      const documentIds = [documentId]
 
-      const alice = new Client({ userName: `alice-${testId}`, url })
-      const bob = new Client({ userName: `bob-${testId}`, url })
-      const charlie = new Client({ userName: `charlie-${testId}`, url })
-
-      alice.join(documentId)
-      bob.join(documentId)
-      charlie.join(documentId)
+      const alice = new Client({ userName: `alice-${testId}`, url, documentIds })
+      const bob = new Client({ userName: `bob-${testId}`, url, documentIds })
+      const charlie = new Client({ userName: `charlie-${testId}`, url, documentIds })
 
       return { alice, bob, charlie, documentId }
     }
@@ -102,7 +99,7 @@ describe('client', () => {
     })
 
     describe('Alice disconnects then reconnects', () => {
-      it('should ', async () => {
+      it(`she's disconnected then she's connected again`, async () => {
         // Alice and Bob connect
         const { alice, bob, documentId } = setup()
         await allConnected(alice, bob)
