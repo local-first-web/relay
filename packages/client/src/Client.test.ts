@@ -123,7 +123,7 @@ describe('client', () => {
     })
 
     describe('send/receive', () => {
-      it('should send a message to a remote peer', async (done) => {
+      it('should send a message to a remote peer', async done => {
         const { alice, bob } = setup()
 
         alice.on('peer.connect', ({ socket }: PeerEventPayload) => {
@@ -131,7 +131,7 @@ describe('client', () => {
         })
 
         bob.on('peer.connect', ({ socket }: PeerEventPayload) => {
-          socket.on('data', (data) => {
+          socket.on('data', data => {
             expect(data.toString()).toEqual('hello')
             done()
           })
@@ -146,14 +146,14 @@ const allDisconnected = (a: Client, b: Client) =>
   Promise.all([disconnection(a, b), disconnection(b, a)])
 
 const connection = (a: Client, b: Client) =>
-  new Promise<void>((resolve) =>
+  new Promise<void>(resolve =>
     a.on('peer.connect', ({ userName }) => {
       if (userName === b.userName) resolve()
     })
   )
 
 const disconnection = (a: Client, b: Client) =>
-  new Promise<void>((resolve) =>
+  new Promise<void>(resolve =>
     a.on('peer.disconnect', ({ userName = '' }) => {
       if (userName === b.userName) resolve()
     })

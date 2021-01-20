@@ -85,7 +85,9 @@ export class Client extends EventEmitter {
   public leave(documentId: DocumentId) {
     this.log('leaving', documentId)
     this.documentIds.delete(documentId)
-    this.peers.forEach((peer) => this.closeSocket(peer, documentId))
+    for (const [userName] of this.peers) {
+      this.removeSocket(userName, documentId)
+    }
     this.sendToServer({ type: 'Leave', documentIds: [documentId] })
   }
 
@@ -94,13 +96,14 @@ export class Client extends EventEmitter {
    * @param userName Name of the peer to disconnect. If none is provided, we disconnect all peers.
    */
   public disconnect(userName?: UserName) {
-    const peersToDisconnect: PeerSocketMap[] = userName
-      ? [this.peers.get(userName)] // just this one
-      : Array.from(this.peers.values()) // all of them
+    const peersToDisconnect = userName
+      ? [userName] // just this one
+      : Array.from(this.peers.keys()) // all of them
 
-    for (const peer of peersToDisconnect) {
+    for (const userName of peersToDisconnect) {
+      const peer = this.getPeer(userName)
       for (const [documentId] of peer) {
-        this.closeSocket(peer, documentId)
+        this.removeSocket(userName, documentId)
       }
     }
   }
@@ -123,36 +126,7 @@ export class Client extends EventEmitter {
       .on('data', (data: any) => {
         this.log('message from signal server', data)
         const msg = JSON.parse(data.toString()) as Message.ServerToClient
-
-        // The only kind of message that we receive from the relay server is an introduction, which tells
-        // us that someone else is interested in the same thing we are. When we receive that message, we
-        // automatically try to connect "directly" to the peer (via piped sockets on the signaling server).
-        switch (msg.type) {
-          case 'Introduction':
-            const { userName, documentIds = [] } = msg
-
-            // use existing connection, or connect to peer
-            const peer: PeerSocketMap = this.peers.get(userName) ?? new Map()
-            this.peers.set(userName, peer)
-
-            // identify any documentIds for which we don't already have a connection to this peer
-            const newKeys = documentIds.filter((documentId) => !peer.has(documentId))
-
-            // identify any documentIds for which we don't already have a connection to this peer
-            newKeys.forEach((documentId) => {
-              const url = `${this.url}/connection/${this.userName}/${userName}/${documentId}`
-              const socket = wsStream(url) //
-                .on('close', () => {
-                  this.closeSocket(peer, documentId)
-                  this.emit('peer.disconnect', { userName, documentId })
-                })
-              peer.set(documentId, socket)
-              this.emit('peer.connect', { userName, documentId, socket })
-            })
-            break
-          default:
-            throw new Error(`Invalid message type '${msg.type}'`)
-        }
+        this.receiveFromServer(msg)
       })
       .on('close', () => {
         // try to reconnect after a delay
@@ -169,7 +143,7 @@ export class Client extends EventEmitter {
       })
 
     this.retryDelay = initialRetryDelay
-    documentIds.forEach((documentId) => this.join(documentId))
+    documentIds.forEach(documentId => this.join(documentId))
     this.emit('server.connect')
   }
 
@@ -178,7 +152,45 @@ export class Client extends EventEmitter {
     this.serverConnection.write(JSON.stringify(msg))
   }
 
-  closeSocket(peer: PeerSocketMap, documentId: DocumentId) {
+  private receiveFromServer(msg: Message.ServerToClient) {
+    // The only kind of message that we receive from the relay server is an introduction, which tells
+    // us that someone else is interested in the same thing we are. When we receive that message, we
+    // automatically try to connect "directly" to the peer (via piped sockets on the signaling server).
+    switch (msg.type) {
+      case 'Introduction':
+        const { userName, documentIds = [] } = msg
+        this.addPeer(userName, documentIds)
+        break
+      default:
+        throw new Error(`Invalid message type '${msg.type}'`)
+    }
+  }
+
+  private getPeer(userName: UserName) {
+    if (!this.peers.has(userName)) this.peers.set(userName, new Map())
+    return this.peers.get(userName)
+  }
+
+  private addPeer(userName: UserName, documentIds: DocumentId[]) {
+    documentIds.forEach(documentId => this.addSocket(userName, documentId))
+  }
+
+  private addSocket(userName: UserName, documentId: DocumentId) {
+    const peer = this.getPeer(userName)
+    if (!peer.has(documentId)) {
+      const url = `${this.url}/connection/${this.userName}/${userName}/${documentId}`
+      const socket = wsStream(url) //
+        .on('close', () => {
+          this.removeSocket(userName, documentId)
+          this.emit('peer.disconnect', { userName, documentId })
+        })
+      peer.set(documentId, socket)
+      this.emit('peer.connect', { userName, documentId, socket })
+    }
+  }
+
+  private removeSocket(userName: UserName, documentId: DocumentId) {
+    const peer = this.getPeer(userName)
     if (peer.has(documentId)) {
       const socket = peer.get(documentId)
       socket.destroy()
