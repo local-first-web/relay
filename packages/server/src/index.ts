@@ -1,2 +1,2 @@
 export * from './Server'
-export { Message } from './types'
+export { Message, DocumentId, UserName } from './types'

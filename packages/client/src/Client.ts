@@ -1,12 +1,11 @@
-import { DocumentId } from '@localfirst/relay/dist/types'
+import { DocumentId } from '@localfirst/relay'
 import debug, { Debugger } from 'debug'
 import { EventEmitter } from 'events'
 import wsStream, { WebSocketDuplex } from 'websocket-stream'
-import { CLOSE, OPEN, PEER } from './constants'
+
 import { newid } from './newid'
 
-import { Peer } from './Peer'
-import { UserName, ClientOptions, Message } from './types'
+import { UserName, Message } from '@localfirst/relay'
 
 const initialRetryDelay = 100
 const backoffCoeff = 1.5 + Math.random() * 0.1
@@ -44,7 +43,8 @@ export class Client extends EventEmitter {
   public userName: UserName
   public url: string
   public documentIds: Set<DocumentId> = new Set()
-  public peers: Map<UserName, Peer> = new Map()
+  // public peers: Map<UserName, Peer> = new Map()
+  public peers: Map<UserName, Map<DocumentId, WebSocketDuplex>> = new Map()
 
   private serverConnection: WebSocketDuplex
   private retryDelay: number
@@ -80,22 +80,29 @@ export class Client extends EventEmitter {
   leave(documentId: DocumentId) {
     this.log('leaving', documentId)
     this.documentIds.delete(documentId)
+    // this.peers.forEach((peer) => {
+    //   peer.remove(documentId)
+    // })
     this.peers.forEach((peer) => {
-      peer.remove(documentId)
+      if (peer.has(documentId)) {
+        const socket = peer.get(documentId)
+        socket.destroy()
+        peer.delete(documentId)
+      }
     })
     this.sendToServer({ type: 'Leave', documentIds: [documentId] })
   }
 
   disconnect(userName?: UserName) {
-    if (userName) {
-      // disconnect from this peer
-      this.peers.get(userName).disconnect()
-      this.peers.delete(userName)
-    } else {
-      // disconnect from all peers
-      this.peers.forEach((peer) => peer.disconnect())
-      this.peers.clear()
-    }
+    const peers: Map<DocumentId, WebSocketDuplex>[] = userName
+      ? [this.peers.get(userName)]
+      : Array.from(this.peers.values())
+    peers.forEach((peer) => {
+      for (const [documentId, socket] of peer) {
+        socket.destroy()
+        peer.delete(documentId)
+      }
+    })
   }
 
   getSocket(userName: UserName, documentId: DocumentId) {
@@ -108,23 +115,22 @@ export class Client extends EventEmitter {
     const url = `${this.url}/introduction/${this.userName}`
     this.log('connecting to signal server', url)
 
-    return wsStream(url)
+    const serverConnection = wsStream(url)
       .on('open', () => {
         // successful connection - reset retry delay
         this.retryDelay = initialRetryDelay
 
-        this.sendToServer({
-          type: 'Join',
-          documentIds: Array.from(this.documentIds),
-        })
-        this.emit(OPEN)
+        this.sendToServer({ type: 'Join', documentIds: Array.from(this.documentIds) })
+        this.emit('server.connect')
       })
 
       .on('close', () => {
+        // try to reconnect after a delay
         if (this.retryDelay < maxRetryDelay) this.retryDelay *= backoffCoeff
         this.log(`Relay connection closed. Retrying in ${Math.floor(this.retryDelay / 1000)}s`)
         setTimeout(() => this.connectToServer(), this.retryDelay)
-        this.emit(CLOSE)
+
+        this.emit('server.disconnect')
       })
 
       .on('data', (data: string) => {
@@ -139,15 +145,23 @@ export class Client extends EventEmitter {
             const { userName, documentIds = [] } = msg
 
             // use existing connection, or connect to peer
-            const peer = this.peers.get(userName) ?? this.connectToPeer(userName)
+            const peer = this.peers.get(userName) ?? new Map<DocumentId, WebSocketDuplex>()
+            this.peers.set(userName, peer)
 
             // identify any documentIds for which we don't already have a connection to this peer
             const newKeys = documentIds.filter((documentId) => !peer.has(documentId))
+
+            // identify any documentIds for which we don't already have a connection to this peer
             newKeys.forEach((documentId) => {
-              peer.on(OPEN, ({ userName, documentId, socket }) => {
-                this.emit(PEER, { documentId, userName, socket })
-              })
-              peer.add(documentId)
+              const url = `${this.url}/connection/${this.userName}/${userName}/${documentId}`
+              const socket = wsStream(url) //
+                .on('close', () => {
+                  peer.delete(documentId)
+                  socket.destroy()
+                  this.emit('peer.disconnect', { userName, documentId })
+                })
+              peer.set(documentId, socket)
+              this.emit('peer.connect', { userName, documentId, socket })
             })
             break
           default:
@@ -158,19 +172,13 @@ export class Client extends EventEmitter {
       .on('error', (args: any) => {
         this.log('error', args)
       })
+
+    return serverConnection
   }
 
   private sendToServer(msg: Message.ClientToServer) {
     this.log('sending to server %o', msg)
     this.serverConnection.write(JSON.stringify(msg))
-  }
-
-  private connectToPeer(userName: UserName): Peer {
-    this.log('requesting direct connection to peer', userName)
-    const url = `${this.url}/connection/${this.userName}` // remaining parameters are added by peer
-    const peer = new Peer({ url, userName })
-    this.peers.set(userName, peer)
-    return peer
   }
 }
 
@@ -182,4 +190,9 @@ export interface PeerEventPayload {
   documentId: DocumentId
   userName: UserName
   socket: WebSocketDuplex
+}
+
+export interface ClientOptions {
+  userName?: UserName
+  url: string
 }

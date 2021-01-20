@@ -6,7 +6,7 @@ import { Server as HttpServer, Socket } from 'net'
 import wsStream, { WebSocketDuplex } from 'websocket-stream'
 import { deduplicate } from './lib/deduplicate'
 import { intersection } from './lib/intersection'
-import { ClientId, ConnectRequestParams, DocumentId, Message } from './types'
+import { UserName, ConnectRequestParams, DocumentId, Message } from './types'
 
 const { app } = expressWs(express())
 
@@ -40,8 +40,8 @@ export class Server extends EventEmitter {
    * - `peer` is always a reference to a client's socket connection.
    * - `documentId` is always a document userName (elsewhere referred to as a 'channel' or a 'discovery documentId'.
    */
-  public peers: Record<ClientId, WebSocketDuplex> = {}
-  public documentIds: Record<ClientId, DocumentId[]> = {}
+  public peers: Record<UserName, WebSocketDuplex> = {}
+  public documentIds: Record<UserName, DocumentId[]> = {}
 
   /**
    * For two peers to connect, they both need to send a connection request, specifying both the
@@ -49,7 +49,7 @@ export class Server extends EventEmitter {
    * Bob, we temporarily store a reference to Alice's request in `holding`, and store any
    * messages from Bob in `messages`.
    */
-  private holding: Record<ClientId, { socket: WebSocketDuplex; messages: any[] }> = {}
+  private holding: Record<UserName, { socket: WebSocketDuplex; messages: any[] }> = {}
 
   /**
    * Keep these references for cleanup
@@ -108,7 +108,7 @@ export class Server extends EventEmitter {
 
   // DISCOVERY
 
-  private openIntroductionConnection(socket: WebSocketDuplex, userName: ClientId) {
+  private openIntroductionConnection(socket: WebSocketDuplex, userName: UserName) {
     this.log('introduction connection', userName)
     this.peers[userName] = socket
 
@@ -118,7 +118,7 @@ export class Server extends EventEmitter {
     this.emit('introductionConnection', userName)
   }
 
-  private handleIntroductionRequest = (userName: ClientId) => (data: any) => {
+  private handleIntroductionRequest = (userName: UserName) => (data: any) => {
     const A = userName // A and B always refer to peer ids
     const message = JSON.parse(data.toString()) as Message.Join
     this.log('received introduction request %o', message)
@@ -146,7 +146,7 @@ export class Server extends EventEmitter {
 
   // If we find another peer interested in the same documentId(s), we send both peers an introduction,
   // which they can use to connect
-  private sendIntroduction = (A: ClientId, B: ClientId, documentIds: DocumentId[]) => {
+  private sendIntroduction = (A: UserName, B: UserName, documentIds: DocumentId[]) => {
     const message: Message.Introduction = {
       type: 'Introduction',
       userName: B, // the userName of the other peer
@@ -155,7 +155,7 @@ export class Server extends EventEmitter {
     this.peers[A]?.write(JSON.stringify(message))
   }
 
-  private closeIntroductionConnection = (userName: ClientId) => () => {
+  private closeIntroductionConnection = (userName: UserName) => () => {
     delete this.peers[userName]
     delete this.documentIds[userName]
   }
@@ -164,7 +164,7 @@ export class Server extends EventEmitter {
 
   private openConnection({ socket, A, B, documentId }: ConnectRequestParams) {
     const socketA = socket
-    // A and B always refer to peers' client ids.
+    // A and B always refer to peers' userNames.
 
     // These are string documentIds for identifying this request and the reciprocal request
     // (which may or may not have already come in)

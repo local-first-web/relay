@@ -1,7 +1,6 @@
 import { Server } from '@localfirst/relay'
 import { getPortPromise as getAvailablePort } from 'portfinder'
 import { Client, PeerEventPayload } from './Client'
-import { PEER } from './constants'
 
 describe('client', () => {
   let port: number
@@ -40,71 +39,89 @@ describe('client', () => {
     }
 
     describe('Alice and Bob both join', () => {
-      beforeEach(() => {})
       it('joins a documentId and connects to a peer', async () => {
-        const { alice, bob } = setup()
-        await connected(alice, bob)
+        // Alice and Bob both join a documentId
+        const { alice, bob, documentId } = setup()
+        await allConnected(alice, bob)
 
-        expect(alice.peers.has(bob.userName)).toBe(true)
-        expect(bob.peers.has(alice.userName)).toBe(true)
+        expect(alice.getSocket(bob.userName, documentId)).not.toBeUndefined()
+        expect(bob.getSocket(alice.userName, documentId)).not.toBeUndefined()
       })
     })
 
-    describe('leave', () => {
+    describe('Alice leaves a document', () => {
       it('leaves a documentId', async () => {
+        // Alice and Bob both join a documentId
         const { alice, bob, documentId } = setup()
-        await connected(alice, bob)
+        await allConnected(alice, bob)
 
-        expect(alice.peers.has(bob.userName)).toBe(true)
         expect(alice.getSocket(bob.userName, documentId)).not.toBeUndefined()
         expect(alice.documentIds).toContain(documentId)
 
-        // Alice decides she's no longer interested in this topic
+        // Alice decides she's no longer interested in this document
         alice.leave(documentId)
 
-        expect(alice.peers.has(bob.userName)).toBe(true) // still have an entry for Bob
-        expect(alice.getSocket(bob.userName, documentId)).toBeUndefined() // but not for this documentId
+        expect(alice.getSocket(bob.userName, documentId)).toBeUndefined()
         expect(alice.documentIds).not.toContain(documentId)
       })
     })
 
-    describe('disconnect from one peer', () => {
-      it('disconnects', async () => {
-        const { alice, bob } = setup()
-        await connected(alice, bob)
+    describe('Alice disconnects from Bob', () => {
+      it('Bob is disconnected from Alice and vice versa', async () => {
+        // Alice and Bob both join a documentId
+        const { alice, bob, documentId } = setup()
+        await allConnected(alice, bob)
 
         alice.disconnect(bob.userName)
+        await allDisconnected(bob, alice)
 
-        // both are disconnected
-        expect(alice.peers.has(bob.userName)).toBe(false)
-        expect(bob.peers.has(alice.userName)).toBe(false)
+        // Bob is disconnected from Alice and vice versa
+        expect(alice.getSocket(bob.userName, documentId)).toBeUndefined()
+        expect(bob.getSocket(alice.userName, documentId)).toBeUndefined()
       })
     })
 
-    describe('disconnect from all peers', () => {
-      it('disconnects', async () => {
-        const { alice, bob, charlie } = setup()
-        await Promise.all([connected(alice, bob), connected(alice, charlie)])
+    describe('Alice disconnects from everyone', () => {
+      it('everyone is disconnected from Alice and vice versa', async () => {
+        // Alice, Bob, and Charlie all join a documentId
+        const { alice, bob, charlie, documentId } = setup()
+        await Promise.all([allConnected(alice, bob), allConnected(alice, charlie)])
 
+        // Alice disconnects from everyone
         alice.disconnect()
+        await Promise.all([allDisconnected(alice, bob), allDisconnected(alice, charlie)])
 
-        expect(alice.peers.has(bob.userName)).toBe(false)
-        expect(alice.peers.has(charlie.userName)).toBe(false)
-        expect(bob.peers.has(alice.userName)).toBe(false)
-        expect(charlie.peers.has(alice.userName)).toBe(false)
+        // Bob is disconnected from Alice and vice versa
+        expect(alice.getSocket(bob.userName, documentId)).toBeUndefined()
+        expect(bob.getSocket(alice.userName, documentId)).toBeUndefined()
+
+        // Charlie is disconnected from Alice and vice versa
+        expect(alice.getSocket(charlie.userName, documentId)).toBeUndefined()
+        expect(charlie.getSocket(alice.userName, documentId)).toBeUndefined()
       })
     })
 
-    describe('disconnect then reconnect', () => {
+    describe('Alice disconnects then reconnects', () => {
       it('should ', async () => {
+        // Alice and Bob connect
         const { alice, bob, documentId } = setup()
-        await connected(alice, bob)
+        await allConnected(alice, bob)
 
         // Alice disconnects
         alice.disconnect()
+        await allDisconnected(alice, bob)
+
+        // Alice and Bob are disconnectred
+        expect(alice.getSocket(bob.userName, documentId)).toBeUndefined()
+        expect(bob.getSocket(alice.userName, documentId)).toBeUndefined()
 
         // Alice reconnects
         alice.join(documentId)
+        await allConnected(alice, bob)
+
+        // Alice and Bob are connected again
+        expect(alice.getSocket(bob.userName, documentId)).not.toBeUndefined()
+        expect(bob.getSocket(alice.userName, documentId)).not.toBeUndefined()
       })
     })
 
@@ -112,11 +129,11 @@ describe('client', () => {
       it('should send a message to a remote peer', async (done) => {
         const { alice, bob } = setup()
 
-        alice.on(PEER, ({ socket }: PeerEventPayload) => {
+        alice.on('peer.connect', ({ socket }: PeerEventPayload) => {
           socket.write('hello')
         })
 
-        bob.on(PEER, ({ socket }: PeerEventPayload) => {
+        bob.on('peer.connect', ({ socket }: PeerEventPayload) => {
           socket.on('data', (data) => {
             expect(data.toString()).toEqual('hello')
             done()
@@ -127,11 +144,20 @@ describe('client', () => {
   })
 })
 
-const connected = (a: Client, b: Client) => Promise.all([connection(a, b), connection(b, a)])
+const allConnected = (a: Client, b: Client) => Promise.all([connection(a, b), connection(b, a)])
+const allDisconnected = (a: Client, b: Client) =>
+  Promise.all([disconnection(a, b), disconnection(b, a)])
 
 const connection = (a: Client, b: Client) =>
   new Promise<void>((resolve) =>
-    a.on(PEER, ({ userName }) => {
+    a.on('peer.connect', ({ userName }) => {
+      if (userName === b.userName) resolve()
+    })
+  )
+
+const disconnection = (a: Client, b: Client) =>
+  new Promise<void>((resolve) =>
+    a.on('peer.disconnect', ({ userName = '' }) => {
       if (userName === b.userName) resolve()
     })
   )

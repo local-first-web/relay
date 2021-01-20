@@ -2,8 +2,8 @@ import { WebSocketDuplex } from 'websocket-stream'
 
 export type ConnectRequestParams = {
   socket: WebSocketDuplex
-  A: ClientId
-  B: ClientId
+  A: UserName
+  B: UserName
   documentId: DocumentId
 }
 
@@ -24,11 +24,11 @@ export namespace Message {
 
   export interface Introduction {
     type: 'Introduction'
-    userName: ClientId // the other peer we're introducing this client to
+    userName: UserName // the other peer we're introducing this client to
     documentIds: DocumentId[]
   }
 }
 
-export type ClientId = string
+export type UserName = string
 
 export type DocumentId = string
