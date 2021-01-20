@@ -11,7 +11,7 @@ import { PeerOptions } from './types'
 export class Peer extends EventEmitter {
   id: string
   url: string
-  private sockets: Map<string, WebSocketDuplex> = new Map() // key -> socket
+  public sockets: Map<string, WebSocketDuplex> = new Map() // key -> socket
 
   constructor({ url, id }: PeerOptions) {
     super()
@@ -39,8 +39,8 @@ export class Peer extends EventEmitter {
   remove(key: string) {
     const socket = this.get(key)
     if (socket) {
+      socket.removeAllListeners()
       socket.end()
-      socket.destroy()
       this.sockets.delete(key)
     }
   }
