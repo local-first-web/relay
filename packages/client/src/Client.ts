@@ -6,20 +6,18 @@ import wsStream, { WebSocketDuplex } from 'websocket-stream'
 import { newid } from './newid'
 
 import { UserName, Message } from '@localfirst/relay'
+import { connect } from 'http2'
 
 const initialRetryDelay = 100
 const backoffCoeff = 1.5 + Math.random() * 0.1
 const maxRetryDelay = 30000
 
+type PeerSocketMap = Map<DocumentId, WebSocketDuplex>
+
 /**
- * This is a client for `relay` that makes it easier to interact with it.
- *
- * You don't strictly need to use this client - you can interact directly with the server the way we
- * do in the server tests - but it automates the business of accepting invitations when they're
- * received.
- *
- * The client keeps track of all peers that the server connects you to, and for each peer it keeps
- * track of each documentId (aka discoveryKey, aka channel) that you're working with that peer on.
+ * This is a client for `relay` that keeps track of all peers that the server connects you to, and
+ * for each peer it keeps track of each documentId (aka discoveryKey, aka channel) that you're
+ * working with that peer on.
  *
  * The peers are WebSocket instances
  *
@@ -41,10 +39,13 @@ const maxRetryDelay = 30000
  */
 export class Client extends EventEmitter {
   public userName: UserName
+
+  /** The base URL of the relay server */
   public url: string
+
+  /** All the DocumentIds we're interested in */
   public documentIds: Set<DocumentId> = new Set()
-  // public peers: Map<UserName, Peer> = new Map()
-  public peers: Map<UserName, Map<DocumentId, WebSocketDuplex>> = new Map()
+  public peers: Map<UserName, PeerSocketMap> = new Map()
 
   private serverConnection: WebSocketDuplex
   private retryDelay: number
@@ -55,20 +56,21 @@ export class Client extends EventEmitter {
    * @param userName a string that identifies you uniquely, defaults to a UUID
    * @param url the url of the `relay`, e.g. `http://myrelay.mydomain.com`
    */
-  constructor({ userName = newid(), url }: ClientOptions) {
+  constructor({ userName = newid(), url, documentIds = [] }: ClientOptions) {
     super()
     this.log = debug(`lf:relay:client:${userName}`)
 
     this.userName = userName
     this.url = url
     this.retryDelay = initialRetryDelay
-    this.serverConnection = this.connectToServer()
+
+    this.connectToServer(documentIds)
   }
 
   /**
-   * Joining a documentId (discoveryKey) lets the server know that you're interested in it, and if there are
-   * other peers who have joined the same documentId, you and the remote peer will both receive an
-   * introduction message, inviting you to connect.
+   * Joins a documentId (discoveryKey) to let the server know that you're interested in it. If there
+   * are other peers who have joined the same documentId, you and the remote peer will both receive
+   * an introduction message, inviting you to connect.
    * @param documentId
    */
   join(documentId: DocumentId) {
@@ -77,32 +79,31 @@ export class Client extends EventEmitter {
     this.sendToServer({ type: 'Join', documentIds: [documentId] })
   }
 
+  /**
+   * Leaves a documentId and closes any connections
+   * @param documentId
+   */
   leave(documentId: DocumentId) {
     this.log('leaving', documentId)
     this.documentIds.delete(documentId)
-    // this.peers.forEach((peer) => {
-    //   peer.remove(documentId)
-    // })
-    this.peers.forEach((peer) => {
-      if (peer.has(documentId)) {
-        const socket = peer.get(documentId)
-        socket.destroy()
-        peer.delete(documentId)
-      }
-    })
+    this.peers.forEach((peer) => this.closeSocket(peer, documentId))
     this.sendToServer({ type: 'Leave', documentIds: [documentId] })
   }
 
+  /**
+   * Disconnects from one or all peers
+   * @param userName Name of the peer to disconnect. If none is provided, we disconnect all peers.
+   */
   disconnect(userName?: UserName) {
-    const peers: Map<DocumentId, WebSocketDuplex>[] = userName
-      ? [this.peers.get(userName)]
-      : Array.from(this.peers.values())
-    peers.forEach((peer) => {
-      for (const [documentId, socket] of peer) {
-        socket.destroy()
-        peer.delete(documentId)
+    const peersToDisconnect: PeerSocketMap[] = userName
+      ? [this.peers.get(userName)] // just this one
+      : Array.from(this.peers.values()) // all of them
+
+    for (const peer of peersToDisconnect) {
+      for (const [documentId] of peer) {
+        this.closeSocket(peer, documentId)
       }
-    })
+    }
   }
 
   getSocket(userName: UserName, documentId: DocumentId) {
@@ -111,29 +112,12 @@ export class Client extends EventEmitter {
 
   ////// PRIVATE
 
-  private connectToServer(): WebSocketDuplex {
+  private connectToServer(documentIds: DocumentId[] = []) {
     const url = `${this.url}/introduction/${this.userName}`
     this.log('connecting to signal server', url)
 
-    const serverConnection = wsStream(url)
-      .on('open', () => {
-        // successful connection - reset retry delay
-        this.retryDelay = initialRetryDelay
-
-        this.sendToServer({ type: 'Join', documentIds: Array.from(this.documentIds) })
-        this.emit('server.connect')
-      })
-
-      .on('close', () => {
-        // try to reconnect after a delay
-        if (this.retryDelay < maxRetryDelay) this.retryDelay *= backoffCoeff
-        this.log(`Relay connection closed. Retrying in ${Math.floor(this.retryDelay / 1000)}s`)
-        setTimeout(() => this.connectToServer(), this.retryDelay)
-
-        this.emit('server.disconnect')
-      })
-
-      .on('data', (data: string) => {
+    this.serverConnection = wsStream(url)
+      .on('data', (data: any) => {
         this.log('message from signal server', data)
         const msg = JSON.parse(data.toString()) as Message.ServerToClient
 
@@ -145,7 +129,7 @@ export class Client extends EventEmitter {
             const { userName, documentIds = [] } = msg
 
             // use existing connection, or connect to peer
-            const peer = this.peers.get(userName) ?? new Map<DocumentId, WebSocketDuplex>()
+            const peer: PeerSocketMap = this.peers.get(userName) ?? new Map()
             this.peers.set(userName, peer)
 
             // identify any documentIds for which we don't already have a connection to this peer
@@ -156,8 +140,7 @@ export class Client extends EventEmitter {
               const url = `${this.url}/connection/${this.userName}/${userName}/${documentId}`
               const socket = wsStream(url) //
                 .on('close', () => {
-                  peer.delete(documentId)
-                  socket.destroy()
+                  this.closeSocket(peer, documentId)
                   this.emit('peer.disconnect', { userName, documentId })
                 })
               peer.set(documentId, socket)
@@ -168,17 +151,36 @@ export class Client extends EventEmitter {
             throw new Error(`Invalid message type '${msg.type}'`)
         }
       })
+      .on('close', () => {
+        // try to reconnect after a delay
+        if (this.retryDelay < maxRetryDelay) this.retryDelay *= backoffCoeff
+        const retryDelaySeconds = Math.floor(this.retryDelay / 1000)
+        this.log(`Relay connection closed. Retrying in ${retryDelaySeconds}s`)
+        setTimeout(() => this.connectToServer(documentIds), this.retryDelay)
 
+        this.emit('server.disconnect')
+      })
       .on('error', (args: any) => {
         this.log('error', args)
+        this.emit('error', args)
       })
 
-    return serverConnection
+    this.retryDelay = initialRetryDelay
+    documentIds.forEach((documentId) => this.join(documentId))
+    this.emit('server.connect')
   }
 
   private sendToServer(msg: Message.ClientToServer) {
     this.log('sending to server %o', msg)
     this.serverConnection.write(JSON.stringify(msg))
+  }
+
+  closeSocket(peer: PeerSocketMap, documentId: DocumentId) {
+    if (peer.has(documentId)) {
+      const socket = peer.get(documentId)
+      socket.destroy()
+      peer.delete(documentId)
+    }
   }
 }
 
@@ -193,6 +195,12 @@ export interface PeerEventPayload {
 }
 
 export interface ClientOptions {
+  /** My user name. If one is not provided, a random one will be created for this session. */
   userName?: UserName
+
+  /** The base URL of the relay server to connect to. */
   url: string
+
+  /** DocumentId(s) to join immediately */
+  documentIds?: DocumentId[]
 }
