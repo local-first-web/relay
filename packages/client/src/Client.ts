@@ -6,7 +6,7 @@ import { CLOSE, OPEN, PEER } from './constants'
 import { newid } from './newid'
 
 import { Peer } from './Peer'
-import { ClientId, ClientOptions, Message } from './types'
+import { UserName, ClientOptions, Message } from './types'
 
 const initialRetryDelay = 100
 const backoffCoeff = 1.5 + Math.random() * 0.1
@@ -20,16 +20,16 @@ const maxRetryDelay = 30000
  * received.
  *
  * The client keeps track of all peers that the server connects you to, and for each peer it keeps
- * track of each key (aka discoveryKey, aka channel) that you're working with that peer on.
+ * track of each documentId (aka discoveryKey, aka channel) that you're working with that peer on.
  *
  * The peers are WebSocket instances
  *
  * The simplest workflow is something like this:
  *
  * ```ts
- * client = new Client({ id: 'my-peer-id', url })
- * client.join('my-document-id')
- * client.on('peer', ({key, id, socket}) => {
+ * client = new Client({ userName: 'my-peer-userName', url })
+ * client.join('my-document-userName')
+ * client.on('peer', ({documentId, userName, socket}) => {
  *   // send a message
  *   socket.write('Hello!')
  *
@@ -41,10 +41,10 @@ const maxRetryDelay = 30000
  * ```
  */
 export class Client extends EventEmitter {
-  public id: ClientId
+  public userName: UserName
   public url: string
-  public keys: Set<DocumentId> = new Set()
-  public peers: Map<ClientId, Peer> = new Map()
+  public documentIds: Set<DocumentId> = new Set()
+  public peers: Map<UserName, Peer> = new Map()
 
   private serverConnection: WebSocketDuplex
   private retryDelay: number
@@ -52,45 +52,45 @@ export class Client extends EventEmitter {
   log: Debugger
 
   /**
-   * @param id a string that identifies you uniquely, defaults to a UUID
+   * @param userName a string that identifies you uniquely, defaults to a UUID
    * @param url the url of the `relay`, e.g. `http://myrelay.mydomain.com`
    */
-  constructor({ id = newid(), url }: ClientOptions) {
+  constructor({ userName = newid(), url }: ClientOptions) {
     super()
-    this.log = debug(`lf:relay:client:${id}`)
+    this.log = debug(`lf:relay:client:${userName}`)
 
-    this.id = id
+    this.userName = userName
     this.url = url
     this.retryDelay = initialRetryDelay
     this.serverConnection = this.connectToServer()
   }
 
   /**
-   * Joining a key (discoveryKey) lets the server know that you're interested in it, and if there are
-   * other peers who have joined the same key, you and the remote peer will both receive an
+   * Joining a documentId (discoveryKey) lets the server know that you're interested in it, and if there are
+   * other peers who have joined the same documentId, you and the remote peer will both receive an
    * introduction message, inviting you to connect.
-   * @param key
+   * @param documentId
    */
-  join(key: DocumentId) {
-    this.log('joining', key)
-    this.keys.add(key)
-    this.sendToServer({ type: 'Join', keys: [key] })
+  join(documentId: DocumentId) {
+    this.log('joining', documentId)
+    this.documentIds.add(documentId)
+    this.sendToServer({ type: 'Join', documentIds: [documentId] })
   }
 
-  leave(key: DocumentId) {
-    this.log('leaving', key)
-    this.keys.delete(key)
+  leave(documentId: DocumentId) {
+    this.log('leaving', documentId)
+    this.documentIds.delete(documentId)
     this.peers.forEach((peer) => {
-      peer.remove(key)
+      peer.remove(documentId)
     })
-    this.sendToServer({ type: 'Leave', keys: [key] })
+    this.sendToServer({ type: 'Leave', documentIds: [documentId] })
   }
 
-  disconnect(id?: ClientId) {
-    if (id) {
+  disconnect(userName?: UserName) {
+    if (userName) {
       // disconnect from this peer
-      this.peers.get(id).disconnect()
-      this.peers.delete(id)
+      this.peers.get(userName).disconnect()
+      this.peers.delete(userName)
     } else {
       // disconnect from all peers
       this.peers.forEach((peer) => peer.disconnect())
@@ -98,14 +98,14 @@ export class Client extends EventEmitter {
     }
   }
 
-  getSocket(id: ClientId, key: DocumentId) {
-    return this.peers.get(id)?.get(key)
+  getSocket(userName: UserName, documentId: DocumentId) {
+    return this.peers.get(userName)?.get(documentId)
   }
 
   ////// PRIVATE
 
   private connectToServer(): WebSocketDuplex {
-    const url = `${this.url}/introduction/${this.id}`
+    const url = `${this.url}/introduction/${this.userName}`
     this.log('connecting to signal server', url)
 
     return wsStream(url)
@@ -115,7 +115,7 @@ export class Client extends EventEmitter {
 
         this.sendToServer({
           type: 'Join',
-          keys: Array.from(this.keys),
+          documentIds: Array.from(this.documentIds),
         })
         this.emit(OPEN)
       })
@@ -136,18 +136,18 @@ export class Client extends EventEmitter {
         // automatically try to connect "directly" to the peer (via piped sockets on the signaling server).
         switch (msg.type) {
           case 'Introduction':
-            const { id, keys = [] } = msg
+            const { userName, documentIds = [] } = msg
 
             // use existing connection, or connect to peer
-            const peer = this.peers.get(id) ?? this.connectToPeer(id)
+            const peer = this.peers.get(userName) ?? this.connectToPeer(userName)
 
-            // identify any keys for which we don't already have a connection to this peer
-            const newKeys = keys.filter((key) => !peer.has(key))
-            newKeys.forEach((key) => {
-              peer.on(OPEN, ({ id, key, socket }) => {
-                this.emit(PEER, { key, id, socket })
+            // identify any documentIds for which we don't already have a connection to this peer
+            const newKeys = documentIds.filter((documentId) => !peer.has(documentId))
+            newKeys.forEach((documentId) => {
+              peer.on(OPEN, ({ userName, documentId, socket }) => {
+                this.emit(PEER, { documentId, userName, socket })
               })
-              peer.add(key)
+              peer.add(documentId)
             })
             break
           default:
@@ -165,11 +165,11 @@ export class Client extends EventEmitter {
     this.serverConnection.write(JSON.stringify(msg))
   }
 
-  private connectToPeer(id: ClientId): Peer {
-    this.log('requesting direct connection to peer', id)
-    const url = `${this.url}/connection/${this.id}` // remaining parameters are added by peer
-    const peer = new Peer({ url, id })
-    this.peers.set(id, peer)
+  private connectToPeer(userName: UserName): Peer {
+    this.log('requesting direct connection to peer', userName)
+    const url = `${this.url}/connection/${this.userName}` // remaining parameters are added by peer
+    const peer = new Peer({ url, userName })
+    this.peers.set(userName, peer)
     return peer
   }
 }
@@ -179,7 +179,7 @@ export class Client extends EventEmitter {
 EventEmitter.defaultMaxListeners = 500
 
 export interface PeerEventPayload {
-  key: DocumentId
-  id: ClientId
+  documentId: DocumentId
+  userName: UserName
   socket: WebSocketDuplex
 }

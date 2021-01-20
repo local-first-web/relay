@@ -7,9 +7,9 @@ import { Message } from 'types'
 
 /**
  * In this context:
- * - `id` is always a peer id.
+ * - `userName` is always a peer userName.
  * - `peer` is always a reference to a client's socket connection.
- * - `key` is always a document id (elsewhere referred to as a 'channel' or a 'discovery key'.
+ * - `documentId` is always a document userName (elsewhere referred to as a 'channel' or a 'discovery documentId'.
  */
 describe('Server', () => {
   let port: number
@@ -30,19 +30,19 @@ describe('Server', () => {
     testId += 1
     const aliceId = `alice-${testId}`
     const bobId = `bob-${testId}`
-    const key = `test-key-${testId}`
-    return { aliceId, bobId, key }
+    const documentId = `test-documentId-${testId}`
+    return { aliceId, bobId, documentId }
   }
 
   afterAll(() => {
     server.close()
   })
 
-  const requestIntroduction = (id: string, key: string) => {
-    const peer = wsStream(`${url}/introduction/${id}`)
+  const requestIntroduction = (userName: string, documentId: string) => {
+    const peer = wsStream(`${url}/introduction/${userName}`)
     const joinMessage: Message.Join = {
       type: 'Join',
-      keys: [key],
+      documentIds: [documentId],
     }
     peer.write(JSON.stringify(joinMessage))
     return peer
@@ -52,10 +52,10 @@ describe('Server', () => {
     it('should make a connection', (done) => {
       const { aliceId } = setup()
 
-      server.once('introductionConnection', (id) => {
-        expect(id).toEqual(aliceId)
+      server.once('introductionConnection', (userName) => {
+        expect(userName).toEqual(aliceId)
         expect(server.peers).toHaveProperty(aliceId)
-        expect(server.keys).toEqual({})
+        expect(server.documentIds).toEqual({})
         done()
       })
 
@@ -64,17 +64,17 @@ describe('Server', () => {
     })
 
     it('should invite peers to connect', async () => {
-      const { aliceId, bobId, key } = setup()
-      const alice = requestIntroduction(aliceId, key)
-      const bob = requestIntroduction(bobId, key)
+      const { aliceId, bobId, documentId } = setup()
+      const alice = requestIntroduction(aliceId, documentId)
+      const bob = requestIntroduction(bobId, documentId)
 
       const aliceDone = new Promise<void>((resolve) => {
         alice.once('data', (d) => {
           const invitation = JSON.parse(d.toString())
           expect(invitation).toEqual({
             type: 'Introduction',
-            id: bobId,
-            keys: [key],
+            userName: bobId,
+            documentIds: [documentId],
           })
           resolve()
         })
@@ -84,8 +84,8 @@ describe('Server', () => {
           const invitation = JSON.parse(d.toString())
           expect(invitation).toEqual({
             type: 'Introduction',
-            id: aliceId,
-            keys: [key],
+            userName: aliceId,
+            documentIds: [documentId],
           })
           resolve()
         })
@@ -98,10 +98,10 @@ describe('Server', () => {
     it('should pipe connections between two peers', (done) => {
       expect.assertions(3)
 
-      const { aliceId, bobId, key } = setup()
+      const { aliceId, bobId, documentId } = setup()
 
-      const aliceRequest = requestIntroduction(aliceId, key)
-      const _bobRequest = requestIntroduction(bobId, key) // need to make request even if we don't use the result
+      const aliceRequest = requestIntroduction(aliceId, documentId)
+      const _bobRequest = requestIntroduction(bobId, documentId) // need to make request even if we don't use the result
 
       aliceRequest.once('data', (d) => {
         // recap of previous test: we'll get an invitation to connect to the remote peer
@@ -109,12 +109,12 @@ describe('Server', () => {
 
         expect(invitation).toEqual({
           type: 'Introduction',
-          id: bobId,
-          keys: [key],
+          userName: bobId,
+          documentIds: [documentId],
         })
 
-        const alice = wsStream(`${url}/connection/${aliceId}/${bobId}/${key}`)
-        const bob = wsStream(`${url}/connection/${bobId}/${aliceId}/${key}`)
+        const alice = wsStream(`${url}/connection/${aliceId}/${bobId}/${documentId}`)
+        const bob = wsStream(`${url}/connection/${bobId}/${aliceId}/${documentId}`)
 
         // send message from local to remote
         alice.write('DUDE!!')
@@ -134,14 +134,14 @@ describe('Server', () => {
     it('should close a peer when asked to', (done) => {
       expect.assertions(1)
 
-      const { aliceId, bobId, key } = setup()
+      const { aliceId, bobId, documentId } = setup()
 
-      const aliceRequest = requestIntroduction(aliceId, key)
-      const _bobRequest = requestIntroduction(bobId, key) // need to make request even if we don't use the result
+      const aliceRequest = requestIntroduction(aliceId, documentId)
+      const _bobRequest = requestIntroduction(bobId, documentId) // need to make request even if we don't use the result
 
       aliceRequest.once('data', (d) => {
-        const alice = wsStream(`${url}/connection/${aliceId}/${bobId}/${key}`)
-        const bob = wsStream(`${url}/connection/${bobId}/${aliceId}/${key}`)
+        const alice = wsStream(`${url}/connection/${aliceId}/${bobId}/${documentId}`)
+        const bob = wsStream(`${url}/connection/${bobId}/${aliceId}/${documentId}`)
 
         alice.write('hey bob!')
         // close local after sending
@@ -162,7 +162,7 @@ describe('Server', () => {
 
   describe('N-way', () => {
     it('Should make introductions between all the peers', (done) => {
-      const { key } = setup()
+      const { documentId } = setup()
       let introductions = 0
       const peers = ['a', 'b', 'c', 'd', 'e']
 
@@ -170,8 +170,8 @@ describe('Server', () => {
 
       expect.assertions(expectedIntroductions)
 
-      const ids = peers.map((id) => `peer-${id}-${testId}`)
-      const sockets = ids.map((id: string) => wsStream(`${url}/introduction/${id}`))
+      const ids = peers.map((userName) => `peer-${userName}-${testId}`)
+      const sockets = ids.map((userName: string) => wsStream(`${url}/introduction/${userName}`))
 
       sockets.forEach((socket: WebSocketDuplex) => {
         socket.on('data', (data) => {
@@ -186,7 +186,7 @@ describe('Server', () => {
         })
       })
       sockets.forEach(async (socket: WebSocketDuplex) => {
-        const joinMessage = { type: 'Join', keys: [key] }
+        const joinMessage = { type: 'Join', documentIds: [documentId] }
         socket.write(JSON.stringify(joinMessage))
       })
     })

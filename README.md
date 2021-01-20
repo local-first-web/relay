@@ -30,17 +30,17 @@ This service offers a solution to each of these two problems.
 
 ### 1. Introduction
 
-Alice can provide one or more document keys that she's interested in. (A document key is a unique ID
+Alice can provide one or more document documentIds that she's interested in. (A document documentId is a unique ID
 for a topic or channel &mdash; it could be a GUID, or just a string like `ambitious-mongoose`.)
 
 [![diagram](./images/relay-introduction.png)](https://raw.githubusercontent.com/local-first-web/relay/master/images/relay-introduction.png)
 
-If Bob is interested in the same key or keys, each will receive an `Introduction` message with the
-other's id. They can then use that information to connect.
+If Bob is interested in the same documentId or documentIds, each will receive an `Introduction` message with the
+other's userName. They can then use that information to connect.
 
 ### 2. Connection
 
-Alice can request to connect with Bob on a given document key. If we get matching connection
+Alice can request to connect with Bob on a given document documentId. If we get matching connection
 requests from Alice and Bob, we pipe their sockets together.
 
 [![diagram](./images/relay-connection.png)](https://raw.githubusercontent.com/local-first-web/relay/master/images/relay-connection.png)
@@ -91,13 +91,13 @@ used with this server.
 > received.
 
 The client keeps track of all peers that the server connects you to, and for each peer it keeps
-track of each key (aka discoveryKey, aka channel) that you're working with that peer on.
+track of each documentId (aka discoveryKey, aka channel) that you're working with that peer on.
 
 ```ts
-client = new Client({ id: 'alice', url: 'myrelay.somedomain.com' })
+client = new Client({ userName: 'alice', url: 'myrelay.somedomain.com' })
 client.join('ambitious-mongoose')
-client.on(peer, (peer, key) => {
-  const socket = peer.get(key) // `socket` is a WebSocket instance
+client.on(peer, (peer, documentId) => {
+  const socket = peer.get(documentId) // `socket` is a WebSocket instance
 
   // send a message
   socket.send('Hello! 🎉')
@@ -149,21 +149,21 @@ This server has two WebSocket endpoints: `introduction` and `connection`.
   ```ts
   {
     type: 'Introduction',
-    id: 'bob', // the peer's id
-    keys: ['ambitious-mongoose'] // documents we're both interested in
+    userName: 'bob', // the peer's userName
+    documentIds: ['ambitious-mongoose'] // documents we're both interested in
   }
   ```
 
 - I can now use this information to request a connection to this peer via the `connection` endpoint:
 
-### Connection endpoint: `/connection/:localId/:remoteId/:key`
+### Connection endpoint: `/connection/:localId/:remoteId/:documentId`
 
 Once I've been given a peer's ID, I make a new connection to this endpoint, e.g.
 `wss://myrelay.somedomain.com/connection/alice/bob/ambitious-mongoose`.
 
 - `:localId` is my unique client identifier.
 - `:remoteId` is the peer's unique client identifier.
-- `:key` is the document ID.
+- `:documentId` is the document ID.
 
 If and when the peer makes a reciprocal connection, e.g.
 `wss://myrelay.somedomain.com/connection/bob/alice/ambitious-mongoose`, the server pipes their sockets

@@ -4,7 +4,7 @@ export type ConnectRequestParams = {
   socket: WebSocketDuplex
   A: ClientId
   B: ClientId
-  key: DocumentId
+  documentId: DocumentId
 }
 
 export namespace Message {
@@ -12,20 +12,20 @@ export namespace Message {
 
   export interface Join {
     type: 'Join'
-    keys: DocumentId[]
+    documentIds: DocumentId[]
   }
 
   export interface Leave {
     type: 'Leave'
-    keys: DocumentId[]
+    documentIds: DocumentId[]
   }
 
   export type ServerToClient = Introduction
 
   export interface Introduction {
     type: 'Introduction'
-    id: ClientId // the other peer we're introducing this client to
-    keys: DocumentId[]
+    userName: ClientId // the other peer we're introducing this client to
+    documentIds: DocumentId[]
   }
 }
 

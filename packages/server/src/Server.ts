@@ -23,11 +23,11 @@ interface ListenOptions {
 /**
  * This server provides two services:
  *
- * - **Introductions** (aka discovery): Alice or Bob can provide one or more document keys that
- *   they're interested in. If Alice is interested in the same key or keys as Bob, each will receive
- *   an `Introduction` message with the other's id. They can then use that information to connect.
+ * - **Introductions** (aka discovery): Alice or Bob can provide one or more document documentIds that
+ *   they're interested in. If Alice is interested in the same documentId or documentIds as Bob, each will receive
+ *   an `Introduction` message with the other's userName. They can then use that information to connect.
  *
- * - **Connection**: Once introduced, Alice can request to connect with Bob on a given document key
+ * - **Connection**: Once introduced, Alice can request to connect with Bob on a given document documentId
  *   (can think of it as a 'channel'). If we get matching connection requests from Alice and Bob, we
  *   just pipe their sockets together.
  */
@@ -36,16 +36,16 @@ export class Server extends EventEmitter {
 
   /**
    * In this context:
-   * - `id` is always a peer id.
+   * - `userName` is always a peer userName.
    * - `peer` is always a reference to a client's socket connection.
-   * - `key` is always a document id (elsewhere referred to as a 'channel' or a 'discovery key'.
+   * - `documentId` is always a document userName (elsewhere referred to as a 'channel' or a 'discovery documentId'.
    */
   public peers: Record<ClientId, WebSocketDuplex> = {}
-  public keys: Record<ClientId, DocumentId[]> = {}
+  public documentIds: Record<ClientId, DocumentId[]> = {}
 
   /**
    * For two peers to connect, they both need to send a connection request, specifying both the
-   * remote peer id and the document key. When we've gotten the request from Alice but not yet from
+   * remote peer userName and the document documentId. When we've gotten the request from Alice but not yet from
    * Bob, we temporarily store a reference to Alice's request in `holding`, and store any
    * messages from Bob in `messages`.
    */
@@ -72,17 +72,17 @@ export class Server extends EventEmitter {
     app.get('/', (_, res) => res.send(logoPage).end())
 
     // Introduction request
-    app.ws('/introduction/:id', (ws, { params: { id } }) => {
-      this.log('received introduction request', id)
+    app.ws('/introduction/:userName', (ws, { params: { userName } }) => {
+      this.log('received introduction request', userName)
       //@ts-ignore
-      this.openIntroductionConnection(wsStream(ws, options), id)
+      this.openIntroductionConnection(wsStream(ws, options), userName)
     })
 
     // Connection request
-    app.ws('/connection/:A/:B/:key', (ws, { params: { A, B, key } }) => {
+    app.ws('/connection/:A/:B/:documentId', (ws, { params: { A, B, documentId } }) => {
       this.log('received connection request', A, B)
       //@ts-ignore
-      this.openConnection({ socket: wsStream(ws, options), A, B, key })
+      this.openConnection({ socket: wsStream(ws, options), A, B, documentId })
     })
 
     return (this.httpServer = app
@@ -108,34 +108,34 @@ export class Server extends EventEmitter {
 
   // DISCOVERY
 
-  private openIntroductionConnection(socket: WebSocketDuplex, id: ClientId) {
-    this.log('introduction connection', id)
-    this.peers[id] = socket
+  private openIntroductionConnection(socket: WebSocketDuplex, userName: ClientId) {
+    this.log('introduction connection', userName)
+    this.peers[userName] = socket
 
-    socket.on('data', this.handleIntroductionRequest(id))
-    socket.on('close', this.closeIntroductionConnection(id))
+    socket.on('data', this.handleIntroductionRequest(userName))
+    socket.on('close', this.closeIntroductionConnection(userName))
 
-    this.emit('introductionConnection', id)
+    this.emit('introductionConnection', userName)
   }
 
-  private handleIntroductionRequest = (id: ClientId) => (data: any) => {
-    const A = id // A and B always refer to peer ids
+  private handleIntroductionRequest = (userName: ClientId) => (data: any) => {
+    const A = userName // A and B always refer to peer ids
     const message = JSON.parse(data.toString()) as Message.Join
     this.log('received introduction request %o', message)
 
-    // An introduction request from the client will include a list of keys to join.
-    // We combine those keys with any we already have and deduplicate.
-    const { keys } = message
-    const current = this.keys[A] ?? []
-    this.keys[A] = current.concat(keys).reduce(deduplicate, [])
+    // An introduction request from the client will include a list of documentIds to join.
+    // We combine those documentIds with any we already have and deduplicate.
+    const { documentIds } = message
+    const current = this.documentIds[A] ?? []
+    this.documentIds[A] = current.concat(documentIds).reduce(deduplicate, [])
 
     // if this peer (A) has interests in common with any existing peer (B), introduce them to each other
     for (const B in this.peers) {
       // don't introduce peer to themselves
       if (A === B) continue
 
-      // find keys that both peers are interested in
-      const commonKeys = intersection(this.keys[A], this.keys[B])
+      // find documentIds that both peers are interested in
+      const commonKeys = intersection(this.documentIds[A], this.documentIds[B])
       if (commonKeys.length) {
         this.log('sending introductions', A, B, commonKeys)
         this.sendIntroduction(A, B, commonKeys)
@@ -144,32 +144,32 @@ export class Server extends EventEmitter {
     }
   }
 
-  // If we find another peer interested in the same key(s), we send both peers an introduction,
+  // If we find another peer interested in the same documentId(s), we send both peers an introduction,
   // which they can use to connect
-  private sendIntroduction = (A: ClientId, B: ClientId, keys: DocumentId[]) => {
+  private sendIntroduction = (A: ClientId, B: ClientId, documentIds: DocumentId[]) => {
     const message: Message.Introduction = {
       type: 'Introduction',
-      id: B, // the id of the other peer
-      keys, // the key(s) both are interested in
+      userName: B, // the userName of the other peer
+      documentIds, // the documentId(s) both are interested in
     }
     this.peers[A]?.write(JSON.stringify(message))
   }
 
-  private closeIntroductionConnection = (id: ClientId) => () => {
-    delete this.peers[id]
-    delete this.keys[id]
+  private closeIntroductionConnection = (userName: ClientId) => () => {
+    delete this.peers[userName]
+    delete this.documentIds[userName]
   }
 
   // PEER CONNECTIONS
 
-  private openConnection({ socket, A, B, key }: ConnectRequestParams) {
+  private openConnection({ socket, A, B, documentId }: ConnectRequestParams) {
     const socketA = socket
     // A and B always refer to peers' client ids.
 
-    // These are string keys for identifying this request and the reciprocal request
+    // These are string documentIds for identifying this request and the reciprocal request
     // (which may or may not have already come in)
-    const AseeksB = `${A}:${B}:${key}`
-    const BseeksA = `${B}:${A}:${key}`
+    const AseeksB = `${A}:${B}:${documentId}`
+    const BseeksA = `${B}:${A}:${documentId}`
 
     const holdMessage = (message: any) => this.holding[AseeksB]?.messages.push(message)
 

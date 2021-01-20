@@ -1,10 +1,10 @@
 export interface ClientOptions {
-  id?: ClientId
+  userName?: UserName
   url: string
 }
 
 export interface PeerOptions {
-  id: ClientId
+  userName: UserName
   url: string
 }
 
@@ -13,23 +13,23 @@ export namespace Message {
 
   export interface Join {
     type: 'Join'
-    keys: DocumentId[]
+    documentIds: DocumentId[]
   }
 
   export interface Leave {
     type: 'Leave'
-    keys: DocumentId[]
+    documentIds: DocumentId[]
   }
 
   export type ServerToClient = Introduction
 
   export interface Introduction {
     type: 'Introduction'
-    id: ClientId // the other peer we're introducing this client to
-    keys: DocumentId[]
+    userName: UserName // the other peer we're introducing this client to
+    documentIds: DocumentId[]
   }
 }
 
-export type ClientId = string
+export type UserName = string
 
 export type DocumentId = string

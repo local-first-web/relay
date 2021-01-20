@@ -4,50 +4,50 @@ import { OPEN } from './constants'
 import { PeerOptions } from './types'
 
 /**
- * The Peer class holds one or more sockets, one per key (aka discoveryKey aka channel).
+ * The Peer class holds one or more sockets, one per documentId (aka discoveryKey aka channel).
  * It's not exported from the package and should be treated as private - consumers can
  * get the socket from the 'peer' event payload.
  */
 export class Peer extends EventEmitter {
-  id: string
+  userName: string
   url: string
-  public sockets: Map<string, WebSocketDuplex> = new Map() // key -> socket
+  public sockets: Map<string, WebSocketDuplex> = new Map() // documentId -> socket
 
-  constructor({ url, id }: PeerOptions) {
+  constructor({ url, userName }: PeerOptions) {
     super()
     this.url = url
-    this.id = id
+    this.userName = userName
   }
 
-  add(key: string) {
+  add(documentId: string) {
     // don't add twice
-    if (!this.sockets.has(key)) {
-      const socket = wsStream(`${this.url}/${this.id}/${key}`)
-      this.sockets.set(key, socket)
-      this.emit(OPEN, { id: this.id, key, socket })
+    if (!this.sockets.has(documentId)) {
+      const socket = wsStream(`${this.url}/${this.userName}/${documentId}`)
+      this.sockets.set(documentId, socket)
+      this.emit(OPEN, { userName: this.userName, documentId, socket })
     }
   }
 
-  has(key: string): boolean {
-    return this.sockets.has(key)
+  has(documentId: string): boolean {
+    return this.sockets.has(documentId)
   }
 
-  get(key: string) {
-    return this.sockets.get(key)
+  get(documentId: string) {
+    return this.sockets.get(documentId)
   }
 
-  remove(key: string) {
-    const socket = this.get(key)
+  remove(documentId: string) {
+    const socket = this.get(documentId)
     if (socket) {
       socket.removeAllListeners()
       socket.end()
-      this.sockets.delete(key)
+      this.sockets.delete(documentId)
     }
   }
 
   disconnect() {
-    for (const key in this.sockets) {
-      this.remove(key)
+    for (const documentId in this.sockets) {
+      this.remove(documentId)
     }
   }
 }
