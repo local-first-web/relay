@@ -1,4 +1,4 @@
-import { DocumentID } from 'types'
+import { DocumentId } from 'types'
 
-export const intersection = (a: DocumentID[] = [], b: DocumentID[] = []) =>
+export const intersection = (a: DocumentId[] = [], b: DocumentId[] = []) =>
   a.filter((key) => b.includes(key))
