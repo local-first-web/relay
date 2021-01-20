@@ -1,2 +1,4 @@
-import { KeySet } from '../types'
-export const intersection = (a: KeySet = [], b: KeySet = []) => a.filter(key => b.includes(key))
+import { DocumentId } from 'types'
+
+export const intersection = (a: DocumentId[] = [], b: DocumentId[] = []) =>
+  a.filter((documentId) => b.includes(documentId))

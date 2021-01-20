@@ -1,126 +1,131 @@
-import debug from 'debug'
-import WebSocket from 'ws'
+import wsStream, { WebSocketDuplex } from 'websocket-stream'
 import { Server } from './Server'
 import { getPortPromise as getAvailablePort } from 'portfinder'
-import { OPEN } from './constants'
-import { MESSAGE } from './constants'
+import { Message } from 'types'
 
-const log = debug('lf:relay:tests')
+// const log = debug('lf:relay:tests')
 
+/**
+ * In this context:
+ * - `userName` is always a peer userName.
+ * - `peer` is always a reference to a client's socket connection.
+ * - `documentId` is always a document userName (elsewhere referred to as a 'channel' or a 'discovery documentId'.
+ */
 describe('Server', () => {
   let port: number
   let url: string
-  let introductionUrl: string
-  let connectionUrl: string
-
   let server: Server
-  let localId: string
-  let remoteId: string
-  let key: string
-  let testId: number = 0
+  let testId = 0
 
   beforeAll(async () => {
     // find a port and set things up
     port = await getAvailablePort({ port: 3100 })
     url = `ws://localhost:${port}`
-    introductionUrl = `${url}/introduction`
-    connectionUrl = `${url}/connection`
 
     server = new Server({ port })
     server.listen({ silent: true })
   })
 
-  beforeEach(() => {
+  const setup = () => {
     testId += 1
-    localId = `local-${testId}`
-    remoteId = `remote-${testId}`
-    key = `test-key-${testId}`
-    log(`TEST ${testId}`)
-  })
-
-  afterEach(() => {})
+    const aliceId = `alice-${testId}`
+    const bobId = `bob-${testId}`
+    const documentId = `test-documentId-${testId}`
+    return { aliceId, bobId, documentId }
+  }
 
   afterAll(() => {
     server.close()
   })
 
-  const makeIntroductionRequest = (id: string, key: string) => {
-    const peer = new WebSocket(`${introductionUrl}/${id}`)
-    const joinMessage = { type: 'Join', id: id, join: [key] }
-    peer.once(OPEN, () => peer.send(JSON.stringify(joinMessage)))
+  const requestIntroduction = (userName: string, documentId: string) => {
+    const peer = wsStream(`${url}/introduction/${userName}`)
+    const joinMessage: Message.Join = {
+      type: 'Join',
+      documentIds: [documentId],
+    }
+    peer.write(JSON.stringify(joinMessage))
     return peer
   }
 
   describe('Introduction', () => {
     it('should make a connection', (done) => {
-      expect.assertions(3)
+      const { aliceId } = setup()
 
-      server.once('introductionConnection', (id) => {
-        expect(id).toEqual(localId)
-      })
-
-      const localPeer = new WebSocket(`${introductionUrl}/${localId}`)
-
-      localPeer.once(OPEN, () => {
-        expect(server.peers).toHaveProperty(localId)
-        expect(server.keys).toEqual({})
+      server.once('introductionConnection', (userName) => {
+        expect(userName).toEqual(aliceId)
+        expect(server.peers).toHaveProperty(aliceId)
+        expect(server.documentIds).toEqual({})
         done()
       })
+
+      // make a connection
+      const alice = wsStream(`${url}/introduction/${aliceId}`)
     })
 
     it('should invite peers to connect', async () => {
-      expect.assertions(4)
+      const { aliceId, bobId, documentId } = setup()
+      const alice = requestIntroduction(aliceId, documentId)
+      const bob = requestIntroduction(bobId, documentId)
 
-      const localPeer = makeIntroductionRequest(localId, key)
-      const remotePeer = makeIntroductionRequest(remoteId, key)
-
-      const localDone = new Promise<void>((resolve) => {
-        localPeer.once(MESSAGE, (d) => {
+      const aliceDone = new Promise<void>((resolve) => {
+        alice.once('data', (d) => {
           const invitation = JSON.parse(d.toString())
-          expect(invitation.id).toEqual(remoteId)
-          expect(invitation.keys).toEqual([key])
+          expect(invitation).toEqual({
+            type: 'Introduction',
+            userName: bobId,
+            documentIds: [documentId],
+          })
           resolve()
         })
       })
-      const remoteDone = new Promise<void>((resolve) => {
-        remotePeer.once(MESSAGE, (d) => {
+      const bobDone = new Promise<void>((resolve) => {
+        bob.once('data', (d) => {
           const invitation = JSON.parse(d.toString())
-          expect(invitation.id).toEqual(localId)
-          expect(invitation.keys).toEqual([key])
+          expect(invitation).toEqual({
+            type: 'Introduction',
+            userName: aliceId,
+            documentIds: [documentId],
+          })
           resolve()
         })
       })
-      await Promise.all([localDone, remoteDone])
+      await Promise.all([aliceDone, bobDone])
     })
   })
 
   describe('Peer connections', () => {
     it('should pipe connections between two peers', (done) => {
-      expect.assertions(4)
+      expect.assertions(3)
 
-      const localIntroductionPeer = makeIntroductionRequest(localId, key)
-      const remoteIntroductionPeer = makeIntroductionRequest(remoteId, key) // need to make request even if we don't use the result
+      const { aliceId, bobId, documentId } = setup()
 
-      localIntroductionPeer.once(MESSAGE, (d) => {
+      const aliceRequest = requestIntroduction(aliceId, documentId)
+      const _bobRequest = requestIntroduction(bobId, documentId) // need to make request even if we don't use the result
+
+      aliceRequest.once('data', (d) => {
         // recap of previous test: we'll get an invitation to connect to the remote peer
         const invitation = JSON.parse(d.toString())
 
-        expect(invitation.id).toEqual(remoteId)
-        expect(invitation.keys).toEqual([key])
+        expect(invitation).toEqual({
+          type: 'Introduction',
+          userName: bobId,
+          documentIds: [documentId],
+        })
 
-        const localPeer = new WebSocket(`${connectionUrl}/${localId}/${remoteId}/${key}`)
-        const remotePeer = new WebSocket(`${connectionUrl}/${remoteId}/${localId}/${key}`)
+        const alice = wsStream(`${url}/connection/${aliceId}/${bobId}/${documentId}`)
+        const bob = wsStream(`${url}/connection/${bobId}/${aliceId}/${documentId}`)
 
         // send message from local to remote
-        localPeer.once(OPEN, () => localPeer.send('DUDE!!'))
-        remotePeer.once(MESSAGE, (d) => {
-          expect(d).toEqual('DUDE!!')
+        alice.write('DUDE!!')
+        bob.once('data', (data) => {
+          expect(data.toString()).toEqual('DUDE!!')
         })
 
         // send message from remote to local
-        remotePeer.once(OPEN, () => remotePeer.send('hello'))
-        localPeer.once(MESSAGE, (d) => {
-          expect(d).toEqual('hello')
+        bob.write('hello')
+        alice.once('data', (data) => {
+          expect(data.toString()).toEqual('hello')
           done()
         })
       })
@@ -129,24 +134,24 @@ describe('Server', () => {
     it('should close a peer when asked to', (done) => {
       expect.assertions(1)
 
-      const localIntroductionPeer = makeIntroductionRequest(localId, key)
-      const remoteIntroductionPeer = makeIntroductionRequest(remoteId, key) // need to make request even if we don't use the result
+      const { aliceId, bobId, documentId } = setup()
 
-      localIntroductionPeer.once(MESSAGE, (d) => {
-        const localPeer = new WebSocket(`${connectionUrl}/${localId}/${remoteId}/${key}`)
-        const remotePeer = new WebSocket(`${connectionUrl}/${remoteId}/${localId}/${key}`)
+      const aliceRequest = requestIntroduction(aliceId, documentId)
+      const _bobRequest = requestIntroduction(bobId, documentId) // need to make request even if we don't use the result
 
-        localPeer.once(OPEN, () => {
-          localPeer.send('DUDE!!')
-          // close local after sending
-          localPeer.close()
-        })
+      aliceRequest.once('data', (d) => {
+        const alice = wsStream(`${url}/connection/${aliceId}/${bobId}/${documentId}`)
+        const bob = wsStream(`${url}/connection/${bobId}/${aliceId}/${documentId}`)
 
-        remotePeer.once(MESSAGE, (d) => {
-          expect(d).toEqual('DUDE!!')
+        alice.write('hey bob!')
+        // close local after sending
+        alice.end()
 
-          remotePeer.send('hello')
-          localPeer.once(MESSAGE, (d) => {
+        bob.once('data', (d) => {
+          expect(d.toString()).toEqual('hey bob!')
+
+          bob.write('sup alice')
+          alice.once('data', () => {
             throw new Error('should never get here')
           })
           done()
@@ -157,19 +162,32 @@ describe('Server', () => {
 
   describe('N-way', () => {
     it('Should make introductions between all the peers', (done) => {
-      const instances = ['a', 'b', 'c', 'd', 'e']
-      const expectedIntroductions = factorial(instances.length) / factorial(instances.length - 2) // Permutations of 2
+      const { documentId } = setup()
+      let introductions = 0
+      const peers = ['a', 'b', 'c', 'd', 'e']
+
+      const expectedIntroductions = factorial(peers.length) / factorial(peers.length - 2) // Permutations of 2
+
       expect.assertions(expectedIntroductions)
-      const ids = instances.map((id) => `peer-${id}-${testId}`)
-      const introductionPeers = ids.map((d) => makeIntroductionRequest(d, key))
-      let invitations = 0
-      introductionPeers.forEach((introductionPeer) => {
-        introductionPeer.on(MESSAGE, (data) => {
-          const introduction = JSON.parse(data.toString())
-          expect(introduction.type).toBe('Introduction')
-          invitations++
-          if (invitations === expectedIntroductions) done()
+
+      const ids = peers.map((userName) => `peer-${userName}-${testId}`)
+      const sockets = ids.map((userName: string) => wsStream(`${url}/introduction/${userName}`))
+
+      sockets.forEach((socket: WebSocketDuplex) => {
+        socket.on('data', (data) => {
+          try {
+            const message = JSON.parse(data.toString())
+            expect(message.type).toBe('Introduction')
+          } catch (e) {}
+
+          introductions += 1
+
+          if (introductions === expectedIntroductions) done()
         })
+      })
+      sockets.forEach(async (socket: WebSocketDuplex) => {
+        const joinMessage = { type: 'Join', documentIds: [documentId] }
+        socket.write(JSON.stringify(joinMessage))
       })
     })
   })

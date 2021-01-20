@@ -1,32 +1,34 @@
-import WebSocket from 'ws'
+import { WebSocketDuplex } from 'websocket-stream'
 
 export type ConnectRequestParams = {
-  peerA: WebSocket
-  A: ClientID
-  B: ClientID
-  key: DocumentID
+  socket: WebSocketDuplex
+  A: UserName
+  B: UserName
+  documentId: DocumentId
 }
 
-export type KeySet = string[]
-
 export namespace Message {
-  export type ClientToServer = Join
+  export type ClientToServer = Join | Leave
 
   export interface Join {
-    type: 'Join' | 'Leave'
-    join?: string[] // document IDs
-    leave?: string[]
+    type: 'Join'
+    documentIds: DocumentId[]
+  }
+
+  export interface Leave {
+    type: 'Leave'
+    documentIds: DocumentId[]
   }
 
   export type ServerToClient = Introduction
 
   export interface Introduction {
     type: 'Introduction'
-    id: string // the other peer we're introducing this client to
-    keys: string[] // document IDs
+    userName: UserName // the other peer we're introducing this client to
+    documentIds: DocumentId[]
   }
 }
 
-export type ClientID = string
+export type UserName = string
 
-export type DocumentID = string
+export type DocumentId = string

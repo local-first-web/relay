@@ -1,6 +1,6 @@
 {
   "name": "@localfirst/relay-client",
-  "version": "1.0.9",
+  "version": "2.0.0",
   "license": "MIT",
   "description": "Client for @localfirst/relay",
   "main": "dist/src/index.js",
@@ -12,15 +12,16 @@
     "test": "jest",
     "watch": "tsc --watch"
   },
-  "author": "",
+  "author": "herb@devresults.com",
   "dependencies": {
     "cuid": "2",
     "debug": "4",
     "ts-node": "9",
+    "websocket-stream": "5",
     "ws": "7"
   },
   "devDependencies": {
-    "@localfirst/relay": "^1.0.9",
+    "@localfirst/relay": "^2.0.0",
     "@types/debug": "4",
     "@types/jest": "26",
     "@types/node": "14",

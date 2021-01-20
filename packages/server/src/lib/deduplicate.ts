@@ -1,3 +1,4 @@
-import { KeySet } from '../types'
+import { DocumentId } from '../types'
 
-export const deduplicate = (acc: KeySet, key: string) => (acc.includes(key) ? acc : acc.concat(key))
+export const deduplicate = (acc: DocumentId[], documentId: string) =>
+  acc.includes(documentId) ? acc : acc.concat(documentId)

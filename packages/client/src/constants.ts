@@ -1,7 +1,0 @@
-﻿export const OPEN = 'open'
-export const READY = 'ready'
-export const CLOSE = 'close'
-export const ERROR = 'error'
-export const PEER = 'peer'
-export const MESSAGE = 'message'
-export const DATA = 'data'

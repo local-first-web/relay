@@ -1,6 +1,6 @@
 {
   "name": "@localfirst/relay-monorepo",
-  "version": "0.1.8",
+  "version": "2.0.1",
   "repository": "https://github.com/local-first-web/relay",
   "author": "herb@devresults.com",
   "license": "MIT",
@@ -38,6 +38,7 @@
     "printWidth": 100,
     "semi": false,
     "singleQuote": true,
+    "arrowParens": "avoid",
     "trailingComma": "es5"
   },
   "jest": {

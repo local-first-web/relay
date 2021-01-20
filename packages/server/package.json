@@ -1,7 +1,7 @@
 {
   "name": "@localfirst/relay",
   "description": "A tiny service that helps local-first applications connect with peers on other devices",
-  "version": "1.0.9",
+  "version": "2.0.0",
   "license": "MIT",
   "main": "dist/index.js",
   "private": false,
@@ -10,12 +10,13 @@
     "build": "tsc",
     "start": "node dist/start.js",
     "test": "jest",
-    "dev": "cross-env DEBUG='lf*' DEBUG_COLORS=1 ts-node-dev --respawn --transpileOnly src/start.ts"
+    "dev": "cross-env DEBUG='lf*' DEBUG_COLORS=1 ts-node-dev src/start.ts --respawn --transpileOnly "
   },
   "dependencies": {
     "bs58": "4",
     "express": "4",
     "express-ws": "4",
+    "websocket-stream": "^5.5.2",
     "ws": "7"
   },
   "devDependencies": {
