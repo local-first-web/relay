@@ -2,9 +2,9 @@ import { WebSocketDuplex } from 'websocket-stream'
 
 export type ConnectRequestParams = {
   socket: WebSocketDuplex
-  A: ClientID
-  B: ClientID
-  key: DocumentID
+  A: ClientId
+  B: ClientId
+  key: DocumentId
 }
 
 export namespace Message {
@@ -12,23 +12,23 @@ export namespace Message {
 
   export interface Join {
     type: 'Join'
-    keys: DocumentID[]
+    keys: DocumentId[]
   }
 
   export interface Leave {
     type: 'Leave'
-    keys: DocumentID[]
+    keys: DocumentId[]
   }
 
   export type ServerToClient = Introduction
 
   export interface Introduction {
     type: 'Introduction'
-    id: ClientID // the other peer we're introducing this client to
-    keys: DocumentID[]
+    id: ClientId // the other peer we're introducing this client to
+    keys: DocumentId[]
   }
 }
 
-export type ClientID = string
+export type ClientId = string
 
-export type DocumentID = string
+export type DocumentId = string
