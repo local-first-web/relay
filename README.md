@@ -95,18 +95,18 @@ track of each documentId (aka discoveryKey, aka channel) that you're working wit
 
 ```ts
 client = new Client({ userName: 'alice', url: 'myrelay.somedomain.com' })
-client.join('ambitious-mongoose')
-client.on(peer, (peer, documentId) => {
-  const socket = peer.get(documentId) // `socket` is a WebSocket instance
+  .join('ambitious-mongoose')
+  .on('peer.connect', ({ documentId, userName, socket }) => {
+    // `socket` is a WebSocket-Stream
 
-  // send a message
-  socket.send('Hello! 🎉')
+    // send a message
+    socket.write('Hello! 🎉')
 
-  // listen for messages
-  socket.onmessage = () => {
-    console.log(messsage)
-  }
-})
+    // listen for messages
+    socket.on('data', message => {
+      console.log(`message from ${userName} about ${documentId}`, message)
+    })
+  })
 ```
 
 ### Security
@@ -180,6 +180,9 @@ MIT
 
 Inspired by https://github.com/orionz/discovery-cloud-server
 
+Formerly part of 🐟 Cevitxe (now [@localfirst/state])
+
+[@localfirst/state]: https://github.com/local-first-web/state
 [@localfirst/auth]: https://github.com/local-first-web/auth
 [@localfirst/relay-client]: ./packages/relay-client/README.md
 [relay-deployable]: https://github.com/local-first-web/relay-deployable
