@@ -1,7 +1,7 @@
 {
   "name": "@localfirst/relay",
   "description": "A tiny service that helps local-first applications connect with peers on other devices",
-  "version": "1.0.9",
+  "version": "2.0.1",
   "license": "MIT",
   "main": "dist/index.js",
   "private": false,
