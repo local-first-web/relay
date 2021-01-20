@@ -1,4 +1,4 @@
-import { DocumentID } from '@localfirst/relay/dist/types'
+import { DocumentId } from '@localfirst/relay/dist/types'
 import debug, { Debugger } from 'debug'
 import { EventEmitter } from 'events'
 import wsStream, { WebSocketDuplex } from 'websocket-stream'
@@ -6,7 +6,7 @@ import { CLOSE, OPEN, PEER } from './constants'
 import { newid } from './newid'
 
 import { Peer } from './Peer'
-import { ClientID, ClientOptions, Message } from './types'
+import { ClientId, ClientOptions, Message } from './types'
 
 const initialRetryDelay = 100
 const backoffCoeff = 1.5 + Math.random() * 0.1
@@ -41,12 +41,12 @@ const maxRetryDelay = 30000
  * ```
  */
 export class Client extends EventEmitter {
-  public id: string
+  public id: ClientId
   public url: string
-  public keys: Set<string> = new Set()
-  public serverConnection: WebSocketDuplex
+  public keys: Set<DocumentId> = new Set()
+  public peers: Map<ClientId, Peer> = new Map()
 
-  private peers: Map<string, Peer> = new Map()
+  private serverConnection: WebSocketDuplex
   private retryDelay: number
 
   log: Debugger
@@ -62,37 +62,44 @@ export class Client extends EventEmitter {
     this.id = id
     this.url = url
     this.retryDelay = initialRetryDelay
-    this.serverConnection = this.connectToServer() // this is a WebSocket
+    this.serverConnection = this.connectToServer()
   }
 
-  // Joining a key (discoveryKey) lets the server know that you're interested in it, and if there are
-  // other peers who have joined the same key, you and the remote peer will both receive an
-  // introduction message, inviting you to connect.
-  join(key: DocumentID) {
+  /**
+   * Joining a key (discoveryKey) lets the server know that you're interested in it, and if there are
+   * other peers who have joined the same key, you and the remote peer will both receive an
+   * introduction message, inviting you to connect.
+   * @param key
+   */
+  join(key: DocumentId) {
     this.log('joining', key)
     this.keys.add(key)
     this.sendToServer({ type: 'Join', keys: [key] })
   }
 
-  leave(key: DocumentID) {
+  leave(key: DocumentId) {
     this.log('leaving', key)
     this.keys.delete(key)
-    this.peers.forEach((peer) => peer.remove(key))
+    this.peers.forEach((peer) => {
+      peer.remove(key)
+    })
     this.sendToServer({ type: 'Leave', keys: [key] })
   }
 
-  disconnect(id?: string) {
+  disconnect(id?: ClientId) {
     if (id) {
       // disconnect from this peer
       this.peers.get(id).disconnect()
+      this.peers.delete(id)
     } else {
       // disconnect from all peers
       this.peers.forEach((peer) => peer.disconnect())
+      this.peers.clear()
     }
   }
 
-  getSocket(id: string, key: string) {
-    return this.peers.get(id).get(key)
+  getSocket(id: ClientId, key: DocumentId) {
+    return this.peers.get(id)?.get(key)
   }
 
   ////// PRIVATE
@@ -158,7 +165,7 @@ export class Client extends EventEmitter {
     this.serverConnection.write(JSON.stringify(msg))
   }
 
-  private connectToPeer(id: ClientID): Peer {
+  private connectToPeer(id: ClientId): Peer {
     this.log('requesting direct connection to peer', id)
     const url = `${this.url}/connection/${this.id}` // remaining parameters are added by peer
     const peer = new Peer({ url, id })
@@ -172,7 +179,7 @@ export class Client extends EventEmitter {
 EventEmitter.defaultMaxListeners = 500
 
 export interface PeerEventPayload {
-  key: DocumentID
-  id: ClientID
+  key: DocumentId
+  id: ClientId
   socket: WebSocketDuplex
 }
