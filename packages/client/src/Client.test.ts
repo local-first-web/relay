@@ -41,8 +41,8 @@ describe('client', () => {
         const { alice, bob, documentId } = setup()
         await allConnected(alice, bob)
 
-        expect(alice.getSocket(bob.userName, documentId)).not.toBeUndefined()
-        expect(bob.getSocket(alice.userName, documentId)).not.toBeUndefined()
+        expect(alice.has(bob.userName, documentId)).toBe(true)
+        expect(bob.has(alice.userName, documentId)).toBe(true)
       })
     })
 
@@ -52,13 +52,13 @@ describe('client', () => {
         const { alice, bob, documentId } = setup()
         await allConnected(alice, bob)
 
-        expect(alice.getSocket(bob.userName, documentId)).not.toBeUndefined()
+        expect(alice.has(bob.userName, documentId)).toBe(true)
         expect(alice.documentIds).toContain(documentId)
 
         // Alice decides she's no longer interested in this document
         alice.leave(documentId)
 
-        expect(alice.getSocket(bob.userName, documentId)).toBeUndefined()
+        expect(alice.has(bob.userName, documentId)).toBe(false)
         expect(alice.documentIds).not.toContain(documentId)
       })
     })
@@ -73,8 +73,8 @@ describe('client', () => {
         await allDisconnected(bob, alice)
 
         // Bob is disconnected from Alice and vice versa
-        expect(alice.getSocket(bob.userName, documentId)).toBeUndefined()
-        expect(bob.getSocket(alice.userName, documentId)).toBeUndefined()
+        expect(alice.has(bob.userName, documentId)).toBe(false)
+        expect(bob.has(alice.userName, documentId)).toBe(false)
       })
     })
 
@@ -89,12 +89,12 @@ describe('client', () => {
         await Promise.all([allDisconnected(alice, bob), allDisconnected(alice, charlie)])
 
         // Bob is disconnected from Alice and vice versa
-        expect(alice.getSocket(bob.userName, documentId)).toBeUndefined()
-        expect(bob.getSocket(alice.userName, documentId)).toBeUndefined()
+        expect(alice.has(bob.userName, documentId)).toBe(false)
+        expect(bob.has(alice.userName, documentId)).toBe(false)
 
         // Charlie is disconnected from Alice and vice versa
-        expect(alice.getSocket(charlie.userName, documentId)).toBeUndefined()
-        expect(charlie.getSocket(alice.userName, documentId)).toBeUndefined()
+        expect(alice.has(charlie.userName, documentId)).toBe(false)
+        expect(charlie.has(alice.userName, documentId)).toBe(false)
       })
     })
 
@@ -109,16 +109,16 @@ describe('client', () => {
         await allDisconnected(alice, bob)
 
         // Alice and Bob are disconnectred
-        expect(alice.getSocket(bob.userName, documentId)).toBeUndefined()
-        expect(bob.getSocket(alice.userName, documentId)).toBeUndefined()
+        expect(alice.has(bob.userName, documentId)).toBe(false)
+        expect(bob.has(alice.userName, documentId)).toBe(false)
 
         // Alice reconnects
         alice.join(documentId)
         await allConnected(alice, bob)
 
         // Alice and Bob are connected again
-        expect(alice.getSocket(bob.userName, documentId)).not.toBeUndefined()
-        expect(bob.getSocket(alice.userName, documentId)).not.toBeUndefined()
+        expect(alice.has(bob.userName, documentId)).toBe(true)
+        expect(bob.has(alice.userName, documentId)).toBe(true)
       })
     })
 

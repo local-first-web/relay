@@ -6,7 +6,6 @@ import wsStream, { WebSocketDuplex } from 'websocket-stream'
 import { newid } from './newid'
 
 import { UserName, Message } from '@localfirst/relay'
-import { connect } from 'http2'
 
 const initialRetryDelay = 100
 const backoffCoeff = 1.5 + Math.random() * 0.1
@@ -73,7 +72,7 @@ export class Client extends EventEmitter {
    * an introduction message, inviting you to connect.
    * @param documentId
    */
-  join(documentId: DocumentId) {
+  public join(documentId: DocumentId) {
     this.log('joining', documentId)
     this.documentIds.add(documentId)
     this.sendToServer({ type: 'Join', documentIds: [documentId] })
@@ -83,7 +82,7 @@ export class Client extends EventEmitter {
    * Leaves a documentId and closes any connections
    * @param documentId
    */
-  leave(documentId: DocumentId) {
+  public leave(documentId: DocumentId) {
     this.log('leaving', documentId)
     this.documentIds.delete(documentId)
     this.peers.forEach((peer) => this.closeSocket(peer, documentId))
@@ -94,7 +93,7 @@ export class Client extends EventEmitter {
    * Disconnects from one or all peers
    * @param userName Name of the peer to disconnect. If none is provided, we disconnect all peers.
    */
-  disconnect(userName?: UserName) {
+  public disconnect(userName?: UserName) {
     const peersToDisconnect: PeerSocketMap[] = userName
       ? [this.peers.get(userName)] // just this one
       : Array.from(this.peers.values()) // all of them
@@ -106,7 +105,11 @@ export class Client extends EventEmitter {
     }
   }
 
-  getSocket(userName: UserName, documentId: DocumentId) {
+  public has(userName: UserName, documentId: DocumentId) {
+    return this.peers.has(userName) && this.peers.get(userName).has(documentId)
+  }
+
+  public get(userName: UserName, documentId: DocumentId) {
     return this.peers.get(userName)?.get(documentId)
   }
 
@@ -184,10 +187,6 @@ export class Client extends EventEmitter {
   }
 }
 
-// It's normal for a document with a lot of participants to have a lot of connections, so increase
-// the limit to avoid spurious warnings about emitter leaks.
-EventEmitter.defaultMaxListeners = 500
-
 export interface PeerEventPayload {
   documentId: DocumentId
   userName: UserName
@@ -204,3 +203,7 @@ export interface ClientOptions {
   /** DocumentId(s) to join immediately */
   documentIds?: DocumentId[]
 }
+
+// It's normal for a document with a lot of participants to have a lot of connections, so increase
+// the limit to avoid spurious warnings about emitter leaks.
+EventEmitter.defaultMaxListeners = 500
