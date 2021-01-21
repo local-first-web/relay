@@ -141,7 +141,7 @@ export class Client extends EventEmitter {
 
   private connectToServer(documentIds: DocumentId[] = []) {
     const url = `${this.url}/introduction/${this.userName}`
-    this.log('connecting to signal server', url)
+    this.log('connecting to relay server', url)
 
     this.serverConnection = wsStream(url)
       .on('data', (data: any) => {
@@ -183,7 +183,7 @@ export class Client extends EventEmitter {
 
     // The only kind of message that we receive from the relay server is an introduction, which tells
     // us that someone else is interested in the same thing we are. When we receive that message, we
-    // automatically try to connect "directly" to the peer (via piped sockets on the signaling server).
+    // automatically try to connect "directly" to the peer (via piped sockets on the relay server).
     const { userName, documentIds = [] } = message
     this.addPeer(userName, documentIds)
   }
