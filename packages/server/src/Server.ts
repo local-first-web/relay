@@ -36,20 +36,20 @@ export class Server extends EventEmitter {
 
   /**
    * In this context:
-   * - `userName` is always a peer userName.
+   * - `userName` is a peer's userName.
    * - `peer` is always a reference to a client's socket connection.
-   * - `documentId` is always a document userName (elsewhere referred to as a 'channel' or a 'discovery documentId'.
+   * - `documentId` is an identifier for a document or a topic (elsewhere referred to as a 'channel' or a 'discovery key').
    */
   public peers: Record<UserName, WebSocketDuplex> = {}
   public documentIds: Record<UserName, DocumentId[]> = {}
 
   /**
    * For two peers to connect, they both need to send a connection request, specifying both the
-   * remote peer userName and the document documentId. When we've gotten the request from Alice but not yet from
+   * remote peer userName and the documentId. When we've gotten the request from Alice but not yet from
    * Bob, we temporarily store a reference to Alice's request in `holding`, and store any
    * messages from Bob in `messages`.
    */
-  private holding: Record<UserName, { socket: WebSocketDuplex; messages: any[] }> = {}
+  private holding: Record<string, { socket: WebSocketDuplex; messages: any[] }> = {}
 
   /**
    * Keep these references for cleanup
@@ -91,12 +91,12 @@ export class Server extends EventEmitter {
         this.emit('ready')
       })
       // keep track of sockets for cleanup
-      .on('connection', (socket) => this.httpSockets.push(socket)))
+      .on('connection', socket => this.httpSockets.push(socket)))
   }
 
   close() {
     this.log('attempting httpServer.close')
-    this.httpSockets.forEach((socket) => {
+    this.httpSockets.forEach(socket => {
       socket.end()
       socket.destroy()
     })
@@ -119,7 +119,7 @@ export class Server extends EventEmitter {
   }
 
   private handleIntroductionRequest = (userName: UserName) => (data: any) => {
-    const A = userName // A and B always refer to peer ids
+    const A = userName // A and B always refer to peer userNames
     const message = JSON.parse(data.toString()) as Message.Join
     this.log('received introduction request %o', message)
 
@@ -164,9 +164,9 @@ export class Server extends EventEmitter {
 
   private openConnection({ socket, A, B, documentId }: ConnectRequestParams) {
     const socketA = socket
-    // A and B always refer to peers' userNames.
+    // A and B always refer to peer userNames.
 
-    // These are string documentIds for identifying this request and the reciprocal request
+    // `AseeksB` and `BseeksA` are keys for identifying this request and the reciprocal request
     // (which may or may not have already come in)
     const AseeksB = `${A}:${B}:${documentId}`
     const BseeksA = `${B}:${A}:${documentId}`
@@ -180,7 +180,7 @@ export class Server extends EventEmitter {
       const { socket: socketB, messages } = this.holding[BseeksA]
 
       // Send any stored messages
-      messages.forEach((message) => socketA.write(message))
+      messages.forEach(message => socketA.write(message))
 
       // Pipe the two sockets together
       socketA.pipe(socketB).pipe(socketA)
@@ -195,11 +195,10 @@ export class Server extends EventEmitter {
       // hold Alice's socket ready, and hold any messages Alice sends to Bob in the meantime
       this.holding[AseeksB] = { socket: socketA, messages: [] }
 
-      // hold on to incoming message from Alice for Bob
-      socketA.on('data', holdMessage)
-
-      // clean up
-      socketA.on('close', () => delete this.holding[AseeksB])
+      socketA
+        // hold on to incoming messages from Alice for Bob
+        .on('data', holdMessage)
+        .on('close', () => delete this.holding[AseeksB])
     }
   }
 }
