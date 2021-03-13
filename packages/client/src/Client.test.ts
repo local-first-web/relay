@@ -70,7 +70,7 @@ describe('client', () => {
         await allConnected(alice, bob)
 
         alice.disconnect(bob.userName)
-        await allDisconnected(bob, alice)
+        await allDisconnected(alice, bob)
 
         // Bob is disconnected from Alice and vice versa
         expect(alice.has(bob.userName, documentId)).toBe(false)
@@ -127,14 +127,15 @@ describe('client', () => {
         const { alice, bob } = setup()
 
         alice.on('peer.connect', ({ socket }: PeerEventPayload) => {
-          socket.write('hello')
+          socket.send('hello')
         })
 
         bob.on('peer.connect', ({ socket }: PeerEventPayload) => {
-          socket.on('data', data => {
+          socket.onmessage = e => {
+            const { data } = e
             expect(data.toString()).toEqual('hello')
             done()
-          })
+          }
         })
       })
     })
@@ -142,6 +143,7 @@ describe('client', () => {
 })
 
 const allConnected = (a: Client, b: Client) => Promise.all([connection(a, b), connection(b, a)])
+
 const allDisconnected = (a: Client, b: Client) =>
   Promise.all([disconnection(a, b), disconnection(b, a)])
 
@@ -158,3 +160,5 @@ const disconnection = (a: Client, b: Client) =>
       if (userName === b.userName) resolve()
     })
   )
+
+const pause = (t = 100) => new Promise<void>(resolve => setTimeout(() => resolve(), t))

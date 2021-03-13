@@ -1,6 +1,4 @@
-import WebSocket from 'ws'
-
-export type ConnectRequestParams = {
+﻿export type ConnectRequestParams = {
   socket: WebSocket
   A: UserName
   B: UserName

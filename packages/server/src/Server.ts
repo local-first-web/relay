@@ -2,15 +2,15 @@ import debug from 'debug'
 import { EventEmitter } from 'events'
 import express from 'express'
 import expressWs from 'express-ws'
+import WebSocket from 'ws'
 import { Server as HttpServer, Socket } from 'net'
-import wsStream, { WebSocketDuplex } from 'websocket-stream'
 import { deduplicate } from './lib/deduplicate'
 import { intersection } from './lib/intersection'
 import { UserName, ConnectRequestParams, DocumentId, Message } from './types'
+import { pipeSockets } from './lib/pipeSockets'
 
 const { app } = expressWs(express())
 
-const options = { objectMode: true }
 const logoPage = `
   <body style="background:black; display:flex; justify-content:center; align-items:center">
     <img src="https://raw.githubusercontent.com/local-first-web/branding/main/svg/relay-v.svg" width="50%" alt="@localfirst/relay logo"/>
@@ -40,7 +40,7 @@ export class Server extends EventEmitter {
    * - `peer` is always a reference to a client's socket connection.
    * - `documentId` is an identifier for a document or a topic (elsewhere referred to as a 'channel' or a 'discovery key').
    */
-  public peers: Record<UserName, WebSocketDuplex> = {}
+  public peers: Record<UserName, WebSocket> = {}
   public documentIds: Record<UserName, DocumentId[]> = {}
 
   /**
@@ -49,7 +49,7 @@ export class Server extends EventEmitter {
    * Bob, we temporarily store a reference to Alice's request in `holding`, and store any
    * messages from Bob in `messages`.
    */
-  private holding: Record<string, { socket: WebSocketDuplex; messages: any[] }> = {}
+  private holding: Record<string, { socket: WebSocket; messages: any[] }> = {}
 
   /**
    * Keep these references for cleanup
@@ -68,30 +68,31 @@ export class Server extends EventEmitter {
   // SERVER
 
   listen({ silent = false }: ListenOptions = {}) {
-    // Allow hitting this server from a browser as a sanity check
-    app.get('/', (_, res) => res.send(logoPage).end())
+    return new Promise<void>((resolve, reject) => {
+      // Allow hitting this server from a browser as a sanity check
+      app.get('/', (_, res) => res.send(logoPage).end())
 
-    // Introduction request
-    app.ws('/introduction/:userName', (ws, { params: { userName } }) => {
-      this.log('received introduction request', userName)
-      //@ts-ignore
-      this.openIntroductionConnection(wsStream(ws, options), userName)
-    })
-
-    // Connection request
-    app.ws('/connection/:A/:B/:documentId', (ws, { params: { A, B, documentId } }) => {
-      this.log('received connection request', A, B)
-      //@ts-ignore
-      this.openConnection({ socket: wsStream(ws, options), A, B, documentId })
-    })
-
-    return (this.httpServer = app
-      .listen(this.port, () => {
-        if (!silent) console.log(`◆ Listening at http://localhost:${this.port}`)
-        this.emit('ready')
+      // Introduction request
+      app.ws('/introduction/:userName', (ws, { params: { userName } }) => {
+        this.log('received introduction request', userName)
+        this.openIntroductionConnection(ws, userName)
       })
-      // keep track of sockets for cleanup
-      .on('connection', socket => this.httpSockets.push(socket)))
+
+      // Connection request
+      app.ws('/connection/:A/:B/:documentId', (ws, { params: { A, B, documentId } }) => {
+        this.log('received connection request', A, B)
+        this.openConnection({ socket: ws, A, B, documentId })
+      })
+
+      this.httpServer = app
+        .listen(this.port, () => {
+          if (!silent) console.log(`🐟 ⯁ Listening at http://localhost:${this.port}`)
+          this.emit('ready')
+          resolve()
+        })
+        // keep track of sockets for cleanup
+        .on('connection', socket => this.httpSockets.push(socket))
+    })
   }
 
   close() {
@@ -108,11 +109,11 @@ export class Server extends EventEmitter {
 
   // DISCOVERY
 
-  private openIntroductionConnection(socket: WebSocketDuplex, userName: UserName) {
+  private openIntroductionConnection(socket: WebSocket, userName: UserName) {
     this.log('introduction connection', userName)
     this.peers[userName] = socket
 
-    socket.on('data', this.handleIntroductionRequest(userName))
+    socket.on('message', this.handleIntroductionRequest(userName))
     socket.on('close', this.closeIntroductionConnection(userName))
 
     this.emit('introductionConnection', userName)
@@ -121,7 +122,7 @@ export class Server extends EventEmitter {
   private handleIntroductionRequest = (userName: UserName) => (data: any) => {
     const A = userName // A and B always refer to peer userNames
     const message = JSON.parse(data.toString()) as Message.Join
-    this.log('received introduction request %o', message)
+    this.log('introduction request: %o', message)
 
     // An introduction request from the client will include a list of documentIds to join.
     // We combine those documentIds with any we already have and deduplicate.
@@ -152,7 +153,7 @@ export class Server extends EventEmitter {
       userName: B, // the userName of the other peer
       documentIds, // the documentId(s) both are interested in
     }
-    this.peers[A]?.write(JSON.stringify(message))
+    this.peers[A]?.send(JSON.stringify(message))
   }
 
   private closeIntroductionConnection = (userName: UserName) => () => {
@@ -180,13 +181,13 @@ export class Server extends EventEmitter {
       const { socket: socketB, messages } = this.holding[BseeksA]
 
       // Send any stored messages
-      messages.forEach(message => socketA.write(message))
+      messages.forEach(message => socketA.send(message))
 
       // Pipe the two sockets together
-      socketA.pipe(socketB).pipe(socketA)
+      pipeSockets(socketA, socketB)
 
       // Don't need to hold the connection or messages any more
-      socketA.removeListener('data', holdMessage)
+      socketA.removeListener('message', holdMessage)
       delete this.holding[BseeksA]
     } else {
       // We haven't heard from Bob yet; hold this connection
@@ -197,7 +198,7 @@ export class Server extends EventEmitter {
 
       socketA
         // hold on to incoming messages from Alice for Bob
-        .on('data', holdMessage)
+        .on('message', holdMessage)
         .on('close', () => delete this.holding[AseeksB])
     }
   }

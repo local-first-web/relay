@@ -1,13 +1,9 @@
-import { DocumentId } from '@localfirst/relay'
 import debug, { Debugger } from 'debug'
 import { EventEmitter } from 'events'
-import wsStream, { WebSocketDuplex } from 'websocket-stream'
-
 import { newid } from './newid'
+import { DocumentId, Message, UserName } from './types'
 
-import { UserName, Message } from '@localfirst/relay'
-
-type PeerSocketMap = Map<DocumentId, WebSocketDuplex>
+type PeerSocketMap = Map<DocumentId, WebSocket>
 
 /**
  * This is a client for `relay` that keeps track of all peers that the server connects you to, and
@@ -46,7 +42,7 @@ export class Client extends EventEmitter {
    * one per documentId that we have in common.) */
   public peers: Map<UserName, PeerSocketMap> = new Map()
 
-  private serverConnection: WebSocketDuplex
+  private serverConnection: WebSocket
   private retryDelay: number
 
   log: Debugger
@@ -76,6 +72,7 @@ export class Client extends EventEmitter {
     this.maxRetryDelay = maxRetryDelay
     this.backoffFactor = backoffFactor
 
+    // start out at the initial retry delay
     this.retryDelay = minRetryDelay
 
     this.connectToServer(documentIds)
@@ -143,25 +140,35 @@ export class Client extends EventEmitter {
     const url = `${this.url}/introduction/${this.userName}`
     this.log('connecting to relay server', url)
 
-    this.serverConnection = wsStream(url)
-      .on('data', (data: any) => {
-        const message = JSON.parse(data.toString()) as Message.ServerToClient
-        this.receiveFromServer(message)
-      })
+    const socket = new WebSocket(url)
 
-      .on('close', () => {
-        this.tryToReconnect(documentIds)
-        this.emit('server.disconnect')
-      })
+    socket.onopen = () => {
+      this.log('connection open')
+      this.retryDelay = this.minRetryDelay
+      documentIds.forEach(documentId => this.join(documentId))
+      this.emit('server.connect')
+    }
 
-      .on('error', (args: any) => {
-        this.log('error', args)
-        this.emit('error', args)
-      })
+    socket.onmessage = messageEvent => {
+      const { data } = messageEvent
+      this.log('message', data)
+      const message = JSON.parse(data.toString()) as Message.ServerToClient
+      this.receiveFromServer(message)
+    }
 
-    this.retryDelay = this.minRetryDelay
-    documentIds.forEach(documentId => this.join(documentId))
-    this.emit('server.connect')
+    socket.onclose = () => {
+      this.log('server close')
+      this.emit('server.disconnect')
+      this.tryToReconnect(documentIds)
+    }
+
+    socket.onerror = (args: any) => {
+      this.log('error', args)
+      this.emit('error', args)
+    }
+
+    this.serverConnection = socket
+    return this.serverConnection
   }
 
   private tryToReconnect(documentIds: string[]) {
@@ -175,7 +182,7 @@ export class Client extends EventEmitter {
 
   private sendToServer(message: Message.ClientToServer) {
     this.log('sending to server %o', message)
-    this.serverConnection.write(JSON.stringify(message))
+    this.serverConnection.send(JSON.stringify(message))
   }
 
   private receiveFromServer(message: Message.ServerToClient) {
@@ -194,6 +201,7 @@ export class Client extends EventEmitter {
   }
 
   private addPeer(userName: UserName, documentIds: DocumentId[]) {
+    this.log(`adding peer: ${userName}`)
     documentIds.forEach(documentId => this.addSocket(userName, documentId))
   }
 
@@ -201,24 +209,33 @@ export class Client extends EventEmitter {
     const peer = this.getPeer(userName)
     if (peer.has(documentId)) return // don't add twice
 
-    const socket = wsStream(`${this.url}/connection/${this.userName}/${userName}/${documentId}`)
+    const socket = new WebSocket(
+      `${this.url}/connection/${this.userName}/${userName}/${documentId}`
+    )
+
+    socket.onopen = () => {
+      peer.set(documentId, socket)
+      this.emit('peer.connect', { userName, documentId, socket })
+    }
 
     // if the other end disconnects, we disconnect
-    socket.on('close', () => {
-      this.emit('peer.disconnect', { userName, documentId })
+    socket.onclose = () => {
+      this.log(`peer disconnect: ${userName} ${documentId}`)
       this.removeSocket(userName, documentId)
-    })
-
-    peer.set(documentId, socket)
-    this.emit('peer.connect', { userName, documentId, socket })
+      this.emit('peer.disconnect', { userName, documentId })
+    }
   }
 
   private removeSocket(userName: UserName, documentId: DocumentId) {
     const peer = this.getPeer(userName)
-    if (!peer.has(documentId)) return // can't remove twice
+    if (!peer.has(documentId)) {
+      this.log(`socket for ${userName} is already gone`)
+      return // can't remove twice
+    }
 
+    this.log(`closing socket ${userName}`)
     const socket = peer.get(documentId)
-    socket.destroy()
+    socket.close()
     peer.delete(documentId)
   }
 }
@@ -226,7 +243,7 @@ export class Client extends EventEmitter {
 export interface PeerEventPayload {
   documentId: DocumentId
   userName: UserName
-  socket: WebSocketDuplex
+  socket: WebSocket
 }
 
 export interface ClientOptions {

@@ -16,9 +16,7 @@
   "dependencies": {
     "cuid": "2",
     "debug": "4",
-    "ts-node": "9",
-    "websocket-stream": "5",
-    "ws": "7"
+    "ts-node": "9"
   },
   "devDependencies": {
     "@localfirst/relay": "^2.0.0",

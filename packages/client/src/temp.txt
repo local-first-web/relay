@@ -1,0 +1,50 @@
+﻿client:👩🏾-1 connecting to relay server ws://localhost:server/introduction/👩🏾-1 
+client:👨‍🦲-1 connecting to relay server ws://localhost:server/introduction/👨‍🦲-1 
+client:👳🏽‍♂️-1 connecting to relay server ws://localhost:server/introduction/👳🏽‍♂️-1 
+server received introduction request 👩🏾-1 
+server introduction connection 👩🏾-1 
+client:👩🏾-1 connection open 
+client:👩🏾-1 joining test-documentId-1 
+client:👩🏾-1 sending to server { type: 'Join', documentIds: [ 'test-documentId-1' ] } 
+server introduction request: { type: 'Join', documentIds: [ 'test-documentId-1' ] } 
+server received introduction request 👨‍🦲-1 
+server introduction connection 👨‍🦲-1 
+client:👨‍🦲-1 connection open 
+client:👨‍🦲-1 joining test-documentId-1 
+client:👨‍🦲-1 sending to server { type: 'Join', documentIds: [ 'test-documentId-1' ] } 
+server introduction request: { type: 'Join', documentIds: [ 'test-documentId-1' ] } 
+server sending introductions 👨‍🦲-1 👩🏾-1 [ 'test-documentId-1' ] 
+client:👨‍🦲-1 message {"type":"Introduction","userName":"👩🏾-1","documentIds":["test-documentId-1"]} 
+client:👨‍🦲-1 adding peer: 👩🏾-1 
+client:👩🏾-1 message {"type":"Introduction","userName":"👨‍🦲-1","documentIds":["test-documentId-1"]} 
+client:👩🏾-1 adding peer: 👨‍🦲-1 
+client:👩🏾-1 disconnecting from 👨‍🦲-1 
+client:👩🏾-1 closing socket 👨‍🦲-1 
+server received introduction request 👳🏽‍♂️-1 
+server introduction connection 👳🏽‍♂️-1 
+client:👳🏽‍♂️-1 connection open 
+client:👳🏽‍♂️-1 joining test-documentId-1 
+client:👳🏽‍♂️-1 sending to server { type: 'Join', documentIds: [ 'test-documentId-1' ] } 
+server introduction request: { type: 'Join', documentIds: [ 'test-documentId-1' ] } 
+server sending introductions 👳🏽‍♂️-1 👩🏾-1 [ 'test-documentId-1' ] 
+server sending introductions 👳🏽‍♂️-1 👨‍🦲-1 [ 'test-documentId-1' ] 
+client:👳🏽‍♂️-1 message {"type":"Introduction","userName":"👩🏾-1","documentIds":["test-documentId-1"]} 
+client:👳🏽‍♂️-1 adding peer: 👩🏾-1 
+client:👳🏽‍♂️-1 message {"type":"Introduction","userName":"👨‍🦲-1","documentIds":["test-documentId-1"]} 
+client:👳🏽‍♂️-1 adding peer: 👨‍🦲-1 
+client:👩🏾-1 message {"type":"Introduction","userName":"👳🏽‍♂️-1","documentIds":["test-documentId-1"]} 
+client:👩🏾-1 adding peer: 👳🏽‍♂️-1 
+client:👨‍🦲-1 message {"type":"Introduction","userName":"👳🏽‍♂️-1","documentIds":["test-documentId-1"]} 
+client:👨‍🦲-1 adding peer: 👳🏽‍♂️-1 
+server received connection request 👨‍🦲-1 👩🏾-1 
+server holding connection for peer 👨‍🦲-1:👩🏾-1:test-documentId-1 
+client:👩🏾-1 peer disconnect: 👨‍🦲-1 test-documentId-1 
+client:👩🏾-1 socket for 👨‍🦲-1 is already gone 
+server received connection request 👳🏽‍♂️-1 👩🏾-1 
+server holding connection for peer 👳🏽‍♂️-1:👩🏾-1:test-documentId-1 
+server received connection request 👳🏽‍♂️-1 👨‍🦲-1 
+server holding connection for peer 👳🏽‍♂️-1:👨‍🦲-1:test-documentId-1 
+server received connection request 👩🏾-1 👳🏽‍♂️-1 
+server found peer, connecting 👩🏾-1:👳🏽‍♂️-1:test-documentId-1 
+server received connection request 👨‍🦲-1 👳🏽‍♂️-1 
+server found peer, connecting 👨‍🦲-1:👳🏽‍♂️-1:test-documentId-1 

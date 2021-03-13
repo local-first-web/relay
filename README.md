@@ -97,7 +97,7 @@ track of each documentId (aka discoveryKey, aka channel) that you're working wit
 client = new Client({ userName: 'alice', url: 'myrelay.somedomain.com' })
   .join('ambitious-mongoose')
   .on('peer.connect', ({ documentId, userName, socket }) => {
-    // `socket` is a WebSocket-Stream
+    // `socket` is a WebSocket
 
     // send a message
     socket.write('Hello! 🎉')
