@@ -165,25 +165,28 @@ describe('Server', () => {
 
       const expectedIntroductions = factorial(peers.length) / factorial(peers.length - 2) // Permutations of 2
 
-      const ids = peers.map(userName => `peer-${userName}-${testId}`)
+      const userNames = peers.map(userName => `peer-${userName}-${testId}`)
 
-      const sockets = ids.map(
+      const sockets = userNames.map(
         (userName: string) => new WebSocket(`${url}/introduction/${userName}`)
       )
 
       sockets.forEach((socket: WebSocket) => {
-        socket.on('message', data => {
+        socket.onmessage = event => {
+          const { data } = event
           const message = JSON.parse(data.toString())
           expect(message.type).toBe('Introduction')
 
           introductions += 1
-
           if (introductions === expectedIntroductions) done()
-        })
+        }
       })
-      const joinMessage = { typ: 'Join', documentIds: [documentId] }
+
+      const joinMessage = { type: 'Join', documentIds: [documentId] }
       sockets.forEach(async (socket: WebSocket) => {
-        socket.on('open', () => socket.send(JSON.stringify(joinMessage)))
+        socket.onopen = () => {
+          socket.send(JSON.stringify(joinMessage))
+        }
       })
     })
   })

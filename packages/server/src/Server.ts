@@ -1,13 +1,13 @@
 import debug from 'debug'
-import { EventEmitter } from 'events'
+import { EventEmitter } from './EventEmitter'
 import express from 'express'
 import expressWs from 'express-ws'
 import WebSocket from 'ws'
 import { Server as HttpServer, Socket } from 'net'
-import { deduplicate } from './lib/deduplicate'
-import { intersection } from './lib/intersection'
+import { deduplicate } from './deduplicate'
+import { intersection } from './intersection'
 import { UserName, ConnectRequestParams, DocumentId, Message } from './types'
-import { pipeSockets } from './lib/pipeSockets'
+import { pipeSockets } from './pipeSockets'
 
 const { app } = expressWs(express())
 
@@ -57,7 +57,7 @@ export class Server extends EventEmitter {
   private httpServer?: HttpServer
   private httpSockets: Socket[] = []
 
-  private log: debug.Debugger
+  public log: debug.Debugger
 
   constructor({ port = 8080 } = {}) {
     super()
@@ -102,7 +102,6 @@ export class Server extends EventEmitter {
       socket.destroy()
     })
     return this.httpServer?.close(() => {
-      this.log('closed')
       this.emit('close')
     })
   }
@@ -110,7 +109,6 @@ export class Server extends EventEmitter {
   // DISCOVERY
 
   private openIntroductionConnection(socket: WebSocket, userName: UserName) {
-    this.log('introduction connection', userName)
     this.peers[userName] = socket
 
     socket.on('message', this.handleIntroductionRequest(userName))
@@ -121,27 +119,39 @@ export class Server extends EventEmitter {
 
   private handleIntroductionRequest = (userName: UserName) => (data: any) => {
     const A = userName // A and B always refer to peer userNames
-    const message = JSON.parse(data.toString()) as Message.Join
+    const message = JSON.parse(data.toString()) as Message.Join | Message.Leave
     this.log('introduction request: %o', message)
 
-    // An introduction request from the client will include a list of documentIds to join.
-    // We combine those documentIds with any we already have and deduplicate.
-    const { documentIds } = message
-    const current = this.documentIds[A] ?? []
-    this.documentIds[A] = current.concat(documentIds).reduce(deduplicate, [])
+    const currentDocumentIds = this.documentIds[A] ?? []
 
-    // if this peer (A) has interests in common with any existing peer (B), introduce them to each other
-    for (const B in this.peers) {
-      // don't introduce peer to themselves
-      if (A === B) continue
+    switch (message.type) {
+      case 'Join':
+        7987
+        // An introduction request from the client will include a list of documentIds to join.
+        // We combine those documentIds with any we already have and deduplicate.
+        this.documentIds[A] = currentDocumentIds.concat(message.documentIds).reduce(deduplicate, [])
 
-      // find documentIds that both peers are interested in
-      const commonKeys = intersection(this.documentIds[A], this.documentIds[B])
-      if (commonKeys.length) {
-        this.log('sending introductions', A, B, commonKeys)
-        this.sendIntroduction(A, B, commonKeys)
-        this.sendIntroduction(B, A, commonKeys)
-      }
+        // if this peer (A) has interests in common with any existing peer (B), introduce them to each other
+        for (const B in this.peers) {
+          // don't introduce peer to themselves
+          if (A === B) continue
+
+          // find documentIds that both peers are interested in
+          const commonKeys = intersection(this.documentIds[A], this.documentIds[B])
+          if (commonKeys.length) {
+            this.log('sending introductions', A, B, commonKeys)
+            this.sendIntroduction(A, B, commonKeys)
+            this.sendIntroduction(B, A, commonKeys)
+          }
+        }
+        break
+      case 'Leave':
+        // remove the provided documentIds from this peer's list
+        this.documentIds[A] = currentDocumentIds.filter(id => !message.documentIds.includes(id))
+        break
+
+      default:
+        break
     }
   }
 

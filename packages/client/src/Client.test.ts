@@ -1,6 +1,7 @@
 import { Server } from '@localfirst/relay'
 import { getPortPromise as getAvailablePort } from 'portfinder'
-import { Client, PeerEventPayload } from './Client'
+import { Client } from './Client'
+import { PeerEventPayload } from './types'
 
 describe('client', () => {
   let port: number
@@ -69,7 +70,7 @@ describe('client', () => {
         const { alice, bob, documentId } = setup()
         await allConnected(alice, bob)
 
-        alice.disconnect(bob.userName)
+        alice.disconnectPeer(bob.userName)
         await allDisconnected(alice, bob)
 
         // Bob is disconnected from Alice and vice versa
@@ -85,7 +86,7 @@ describe('client', () => {
         await Promise.all([allConnected(alice, bob), allConnected(alice, charlie)])
 
         // Alice disconnects from everyone
-        alice.disconnect()
+        alice.disconnectServer()
         await Promise.all([allDisconnected(alice, bob), allDisconnected(alice, charlie)])
 
         // Bob is disconnected from Alice and vice versa
@@ -105,7 +106,7 @@ describe('client', () => {
         await allConnected(alice, bob)
 
         // Alice disconnects
-        alice.disconnect()
+        alice.disconnectServer()
         await allDisconnected(alice, bob)
 
         // Alice and Bob are disconnected
