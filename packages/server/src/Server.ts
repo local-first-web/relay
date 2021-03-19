@@ -90,8 +90,13 @@ export class Server extends EventEmitter {
           this.emit('ready')
           resolve()
         })
-        // keep track of sockets for cleanup
-        .on('connection', socket => this.httpSockets.push(socket))
+        .on('connection', socket => {
+          // keep track of sockets for cleanup
+          this.httpSockets.push(socket)
+
+          // without this, connections automatically close after ~2 min of inactivity
+          socket.setKeepAlive(true)
+        })
     })
   }
 
