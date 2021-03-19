@@ -126,7 +126,6 @@ export class Server extends EventEmitter {
 
     switch (message.type) {
       case 'Join':
-        7987
         // An introduction request from the client will include a list of documentIds to join.
         // We combine those documentIds with any we already have and deduplicate.
         this.documentIds[A] = currentDocumentIds.concat(message.documentIds).reduce(deduplicate, [])
