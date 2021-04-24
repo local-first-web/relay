@@ -1,24 +1,25 @@
 {
   "name": "@localfirst/relay-client",
   "version": "3.0.2",
-  "license": "MIT",
   "description": "Client for @localfirst/relay",
+  "repository": "https://github.com/local-first-web/relay",
+  "author": "herb@devresults.com",
+  "license": "MIT",
+  "private": false,
   "main": "dist/src/index.js",
   "types": "dist/src/index.d.ts",
-  "private": false,
   "scripts": {
     "prebuild": "rimraf dist",
     "build": "tsc",
     "test": "jest",
     "watch": "tsc --watch"
   },
-  "author": "herb@devresults.com",
   "dependencies": {
     "cuid": "2",
     "debug": "4"
   },
   "devDependencies": {
-    "@localfirst/relay": "^3.0.1",
+    "@localfirst/relay": "3",
     "@types/debug": "4",
     "@types/jest": "26",
     "@types/ws": "7",
@@ -36,6 +37,5 @@
       "/node_modules/",
       "/dist"
     ]
-  },
-  "gitHead": "5dc0ed947e262c346acab06f5c945e02f34a1b35"
+  }
 }

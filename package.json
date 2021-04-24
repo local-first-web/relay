@@ -1,6 +1,7 @@
 {
   "name": "@localfirst/relay-monorepo",
-  "version": "3.0.0",
+  "version": "3.0.2",
+  "description": "Monorepo containing @localfirst/relay and @localfirst/relay-client",
   "repository": "https://github.com/local-first-web/relay",
   "author": "herb@devresults.com",
   "license": "MIT",
@@ -14,8 +15,7 @@
     "pub": "lerna publish --yes",
     "test": "jest",
     "test:log": "cross-env DEBUG='lf*' DEBUG_COLORS=1 yarn test",
-    "test:watch": "jest --watch",
-    "purge": "scripts/purge.bat"
+    "test:watch": "jest --watch"
   },
   "devDependencies": {
     "@types/jest": "26",
