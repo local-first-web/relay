@@ -8,7 +8,11 @@ export type ConnectRequestParams = {
 }
 
 export namespace Message {
-  export type ClientToServer = Join | Leave
+  export type ClientToServer = Join | Leave | Heartbeat
+
+  export interface Heartbeat {
+    type: 'Heartbeat'
+  }
 
   export interface Join {
     type: 'Join'
