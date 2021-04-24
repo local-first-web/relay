@@ -1,6 +1,6 @@
 {
   "name": "@localfirst/relay-client",
-  "version": "3.0.2",
+  "version": "3.0.3",
   "description": "Client for @localfirst/relay",
   "repository": "https://github.com/local-first-web/relay",
   "author": "herb@devresults.com",
@@ -19,7 +19,7 @@
     "debug": "4"
   },
   "devDependencies": {
-    "@localfirst/relay": "3",
+    "@localfirst/relay": "^3.0.3",
     "@types/debug": "4",
     "@types/jest": "26",
     "@types/ws": "7",
