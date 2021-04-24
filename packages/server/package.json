@@ -1,10 +1,12 @@
 {
   "name": "@localfirst/relay",
-  "description": "A tiny service that helps local-first applications connect with peers on other devices",
   "version": "3.0.1",
+  "description": "A tiny service that helps local-first applications connect with peers on other devices",
+  "repository": "https://github.com/local-first-web/relay",
+  "author": "herb@devresults.com",
   "license": "MIT",
-  "main": "dist/index.js",
   "private": false,
+  "main": "dist/index.js",
   "scripts": {
     "prebuild": "rimraf dist",
     "build": "tsc",
@@ -43,6 +45,5 @@
       "/node_modules/",
       "/dist"
     ]
-  },
-  "gitHead": "095389e4be69af5cec2a123d6796c77c48c33035"
+  }
 }
