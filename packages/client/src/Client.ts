@@ -4,6 +4,8 @@ import { isReady } from './isReady'
 import { newid } from './newid'
 import { ClientOptions, DocumentId, Message, PeerSocketMap, UserName } from './types'
 
+const HEARTBEAT = JSON.stringify({ type: 'Heartbeat' })
+
 /**
  * This is a client for `relay` that keeps track of all peers that the server connects you to, and
  * for each peer it keeps track of each documentId (aka discoveryKey, aka channel) that you're
@@ -34,7 +36,7 @@ export class Client extends EventEmitter {
   /** The base URL of the relay server */
   public url: string
 
-  /** All the DocumentIds we're interested in */
+  /** All the document IDs we're interested in */
   public documentIds: Set<DocumentId> = new Set()
 
   /** All the peers we're connected to.
@@ -50,6 +52,7 @@ export class Client extends EventEmitter {
   private minRetryDelay: number
   private maxRetryDelay: number
   private backoffFactor: number
+  private heartbeat: ReturnType<typeof setInterval>
 
   /**
    * @param userName a string that identifies you uniquely, defaults to a UUID
@@ -170,6 +173,8 @@ export class Client extends EventEmitter {
       this.retryDelay = this.minRetryDelay
       documentIds.forEach(documentId => this.join(documentId))
       this.emit('server.connect')
+
+      this.heartbeat = setInterval(() => socket.send(HEARTBEAT), 5000)
     }
 
     socket.onmessage = messageEvent => {
@@ -196,6 +201,7 @@ export class Client extends EventEmitter {
 
           // add the socket to the map for this peer
           peer.set(documentId, socket)
+
           this.emit('peer.connect', { userName, documentId, socket })
         }
 
@@ -212,6 +218,9 @@ export class Client extends EventEmitter {
 
     socket.onclose = () => {
       this.emit('server.disconnect')
+
+      // stop heartbeat
+      clearInterval(this.heartbeat)
 
       // try to reconnect after a delay
       setTimeout(() => this.connectToServer(documentIds), this.retryDelay)
