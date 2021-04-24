@@ -93,9 +93,6 @@ export class Server extends EventEmitter {
         .on('connection', socket => {
           // keep track of sockets for cleanup
           this.httpSockets.push(socket)
-
-          // without this, connections automatically close after ~2 min of inactivity
-          socket.setKeepAlive(true)
         })
     })
   }
@@ -124,13 +121,18 @@ export class Server extends EventEmitter {
 
   private handleIntroductionRequest = (userName: UserName) => (data: any) => {
     const A = userName // A and B always refer to peer userNames
-    const message = JSON.parse(data.toString()) as Message.Join | Message.Leave
-    this.log('introduction request: %o', message)
+    const message = JSON.parse(data.toString()) as Message.ClientToServer
 
     const currentDocumentIds = this.documentIds[A] ?? []
 
     switch (message.type) {
+      case 'Heartbeat':
+        // nothing to do
+        this.log('♥')
+        break
+
       case 'Join':
+        this.log('introduction request: %o', message)
         // An introduction request from the client will include a list of documentIds to join.
         // We combine those documentIds with any we already have and deduplicate.
         this.documentIds[A] = currentDocumentIds.concat(message.documentIds).reduce(deduplicate, [])
@@ -190,10 +192,10 @@ export class Server extends EventEmitter {
 
     if (this.holding[BseeksA]) {
       // We already have a connection request from Bob; hook them up
-      this.log('found peer, connecting', AseeksB)
 
       const { socket: socketB, messages } = this.holding[BseeksA]
 
+      this.log(`found peer, connecting ${AseeksB} (${messages.length} stored messages)`)
       // Send any stored messages
       messages.forEach(message => socketA.send(message))
 
