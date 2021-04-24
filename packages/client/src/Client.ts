@@ -1,10 +1,25 @@
 import debug, { Debugger } from 'debug'
 import { EventEmitter } from './EventEmitter'
+import TypedEmitter from 'typed-emitter'
 import { isReady } from './isReady'
 import { newid } from './newid'
 import { ClientOptions, DocumentId, Message, PeerSocketMap, UserName } from './types'
 
 const HEARTBEAT = JSON.stringify({ type: 'Heartbeat' })
+
+interface PeerEventPayload {
+  userName: UserName
+  documentId: DocumentId
+  socket: WebSocket
+}
+
+interface ClientEvents {
+  'server.connect': () => void
+  'server.disconnect': () => void
+  'peer.connect': ({ userName, documentId, socket }: PeerEventPayload) => void
+  'peer.disconnect': ({ userName, documentId, socket }: PeerEventPayload) => void
+  error: (ev: Event) => void
+}
 
 /**
  * This is a client for `relay` that keeps track of all peers that the server connects you to, and
@@ -30,7 +45,7 @@ const HEARTBEAT = JSON.stringify({ type: 'Heartbeat' })
  *   })
  * ```
  */
-export class Client extends EventEmitter {
+export class Client extends (EventEmitter as new () => TypedEmitter<ClientEvents>) {
   public userName: UserName
 
   /** The base URL of the relay server */
@@ -208,7 +223,7 @@ export class Client extends EventEmitter {
         // if the other end disconnects, we disconnect
         socket.onclose = () => {
           this.closeSocket(userName, documentId)
-          this.emit('peer.disconnect', { userName, documentId })
+          this.emit('peer.disconnect', { userName, documentId, socket })
         }
       }
 
@@ -232,8 +247,8 @@ export class Client extends EventEmitter {
       this.log(`Relay connection closed. Retrying in ${Math.floor(this.retryDelay / 1000)}s`)
     }
 
-    socket.onerror = (args: any) => {
-      this.emit('error', args)
+    socket.onerror = (ev: Event) => {
+      this.emit('error', ev)
     }
 
     this.serverConnection = socket
