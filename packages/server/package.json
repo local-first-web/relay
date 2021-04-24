@@ -1,7 +1,7 @@
 {
   "name": "@localfirst/relay",
   "description": "A tiny service that helps local-first applications connect with peers on other devices",
-  "version": "3.0.0",
+  "version": "3.0.1",
   "license": "MIT",
   "main": "dist/index.js",
   "private": false,
@@ -14,9 +14,9 @@
   },
   "dependencies": {
     "bs58": "4",
+    "debug": "4",
     "express": "4",
     "express-ws": "4",
-    "debug": "4",
     "ws": "7"
   },
   "devDependencies": {
