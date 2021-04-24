@@ -16,6 +16,7 @@
     "bs58": "4",
     "express": "4",
     "express-ws": "4",
+    "debug": "4",
     "ws": "7"
   },
   "devDependencies": {
@@ -27,7 +28,6 @@
     "@types/websocket": "^1.0.2",
     "@types/ws": "7",
     "cross-env": "7",
-    "debug": "4",
     "jest": "26",
     "mock-socket": "9",
     "portfinder": "1",

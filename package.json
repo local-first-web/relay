@@ -1,6 +1,6 @@
 {
   "name": "@localfirst/relay-monorepo",
-  "version": "2.0.1",
+  "version": "3.0.0",
   "repository": "https://github.com/local-first-web/relay",
   "author": "herb@devresults.com",
   "license": "MIT",
@@ -23,7 +23,8 @@
     "jest": "26",
     "lerna": "3",
     "npm-run-all": "4",
-    "ts-jest": "26"
+    "ts-jest": "26",
+    "typescript": "4"
   },
   "workspaces": {
     "packages": [
