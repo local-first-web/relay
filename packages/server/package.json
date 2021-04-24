@@ -25,21 +25,16 @@
     "@types/express-ws": "3",
     "@types/jest": "26",
     "@types/node": "14",
-    "@types/websocket": "^1.0.2",
     "@types/ws": "7",
     "cross-env": "7",
     "jest": "26",
-    "mock-socket": "9",
     "portfinder": "1",
     "prettier": "2",
     "rimraf": "3",
-    "supports-color": "7",
     "ts-jest": "26",
-    "ts-node": "9",
     "ts-node-dev": "1",
     "tslib": "1",
-    "typescript": "3",
-    "websocket": "1"
+    "typescript": "3"
   },
   "jest": {
     "preset": "ts-jest",
