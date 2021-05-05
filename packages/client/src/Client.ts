@@ -61,6 +61,11 @@ export class Client extends (EventEmitter as new () => TypedEmitter<ClientEvents
 
   public log: Debugger
 
+  /** 
+   * If the connection to the server is currently open
+   */
+  public open: boolean
+
   private serverConnection: WebSocket
   private retryDelay: number
 
@@ -188,6 +193,7 @@ export class Client extends (EventEmitter as new () => TypedEmitter<ClientEvents
       this.retryDelay = this.minRetryDelay
       documentIds.forEach(documentId => this.join(documentId))
       this.emit('server.connect')
+      this.open = true
 
       this.heartbeat = setInterval(() => socket.send(HEARTBEAT), 5000)
     }
@@ -232,6 +238,7 @@ export class Client extends (EventEmitter as new () => TypedEmitter<ClientEvents
     }
 
     socket.onclose = () => {
+      this.open = false
       this.emit('server.disconnect')
 
       // stop heartbeat

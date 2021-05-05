@@ -140,6 +140,37 @@ describe('client', () => {
         })
       })
     })
+
+    describe('open', () => {
+      it('stays open when peer disconnects', async done => {
+        const { alice, bob } = setup()
+
+        await allConnected(alice, bob)
+
+        expect(alice.open).toBe(true)
+        expect(bob.open).toBe(true)
+
+        alice.disconnectPeer(bob.userName)
+        expect(alice.open).toBe(true)
+        expect(bob.open).toBe(true)
+        done()
+      })
+
+      it('closes when server disconnects', async done => {
+        const { alice, bob } = setup()
+
+        await allConnected(alice, bob)
+
+        expect(alice.open).toBe(true)
+        expect(bob.open).toBe(true)
+
+        alice.on('server.disconnect', () => {
+          expect(alice.open).toBe(false)
+          done()
+        })
+        server.close()
+      })
+    })
   })
 })
 
