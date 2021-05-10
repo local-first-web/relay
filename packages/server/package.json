@@ -17,6 +17,7 @@
   "dependencies": {
     "bs58": "4",
     "debug": "4",
+    "eventemitter3": "4",
     "express": "4",
     "express-ws": "4",
     "ws": "7"

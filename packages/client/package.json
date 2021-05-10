@@ -15,6 +15,7 @@
     "watch": "tsc --watch"
   },
   "dependencies": {
+    "eventemitter3": "4",
     "cuid": "2",
     "debug": "4"
   },
