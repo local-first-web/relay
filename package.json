@@ -1,6 +1,6 @@
 {
   "name": "@localfirst/relay-monorepo",
-  "version": "3.0.3",
+  "version": "3.1.0",
   "description": "Monorepo containing @localfirst/relay and @localfirst/relay-client",
   "repository": "https://github.com/local-first-web/relay",
   "author": "herb@devresults.com",
