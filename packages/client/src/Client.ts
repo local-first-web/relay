@@ -69,6 +69,7 @@ export class Client extends EventEmitter {
   private maxRetryDelay: number
   private backoffFactor: number
   private heartbeat: ReturnType<typeof setInterval>
+  private serverConnectionQueue: Message.ClientToServer[] = []
 
   /**
    * @param userName a string that identifies you uniquely, defaults to a UUID
@@ -107,8 +108,8 @@ export class Client extends EventEmitter {
   public join(documentId: DocumentId) {
     this.log('joining', documentId)
     this.documentIds.add(documentId)
-    const message = { type: 'Join', documentIds: [documentId] }
-    this.serverConnection.send(JSON.stringify(message))
+    const message: Message.Join = { type: 'Join', documentIds: [documentId] }
+    this._send(message)
     return this
   }
 
@@ -122,8 +123,8 @@ export class Client extends EventEmitter {
     for (const [userName] of this.peers) {
       this.closeSocket(userName, documentId)
     }
-    const message = { type: 'Leave', documentIds: [documentId] }
-    this.serverConnection.send(JSON.stringify(message))
+    const message: Message.Leave = { type: 'Leave', documentIds: [documentId] }
+    this._send(message)
     return this
   }
 
@@ -187,6 +188,7 @@ export class Client extends EventEmitter {
     socket.onopen = async () => {
       await isReady(socket)
       this.retryDelay = this.minRetryDelay
+      this._drainQueue()
       documentIds.forEach(documentId => this.join(documentId))
       this.emit('server.connect')
 
@@ -254,6 +256,21 @@ export class Client extends EventEmitter {
 
     this.serverConnection = socket
     return this.serverConnection
+  }
+
+  private _drainQueue() {
+    while (this.serverConnectionQueue.length) {
+      let message = this.serverConnectionQueue.pop()
+      this._send(message)
+    }
+  }
+
+  private _send(message: Message.ClientToServer) {
+    try {
+      this.serverConnection.send(JSON.stringify(message))
+    } catch (err) {
+      this.serverConnectionQueue.push(message)
+    }
   }
 
   private closeSocket(userName: UserName, documentId: DocumentId) {
