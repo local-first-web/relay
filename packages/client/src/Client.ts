@@ -60,10 +60,14 @@ export class Client extends EventEmitter {
    * one per documentId that we have in common.) */
   public peers: Map<UserName, PeerSocketMap> = new Map()
 
+  /**
+   * When disconnected, the delay in milliseconds before the next retry
+   */
+  public retryDelay: number
+
   public log: Debugger
 
   private serverConnection: WebSocket
-  private retryDelay: number
 
   private minRetryDelay: number
   private maxRetryDelay: number
