@@ -1,6 +1,5 @@
 import debug, { Debugger } from 'debug'
 import { EventEmitter } from './EventEmitter'
-// import TypedEmitter from 'typed-emitter'
 import { isReady } from './isReady'
 import { newid } from './newid'
 import { ClientOptions, DocumentId, Message, PeerSocketMap, UserName } from './types'
@@ -12,14 +11,6 @@ export interface PeerEventPayload {
   documentId: DocumentId
   socket: WebSocket
 }
-
-// interface ClientEvents {
-//   'server.connect': () => void
-//   'server.disconnect': () => void
-//   'peer.connect': ({ userName, documentId, socket }: PeerEventPayload) => void
-//   'peer.disconnect': ({ userName, documentId, socket }: PeerEventPayload) => void
-//   error: (ev: Event) => void
-// }
 
 /**
  * This is a client for `relay` that keeps track of all peers that the server connects you to, and
@@ -67,7 +58,7 @@ export class Client extends EventEmitter {
 
   public log: Debugger
 
-  /** 
+  /**
    * If the connection to the server is currently open
    */
   public open: boolean
@@ -294,7 +285,3 @@ export class Client extends EventEmitter {
     }
   }
 }
-
-// It's normal for a document with a lot of participants to have a lot of connections, so increase
-// the limit to avoid spurious warnings about emitter leaks.
-// EventEmitter.defaultMaxListeners = 500
