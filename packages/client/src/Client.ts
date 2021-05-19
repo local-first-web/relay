@@ -1,25 +1,25 @@
 import debug, { Debugger } from 'debug'
 import { EventEmitter } from './EventEmitter'
-import TypedEmitter from 'typed-emitter'
+// import TypedEmitter from 'typed-emitter'
 import { isReady } from './isReady'
 import { newid } from './newid'
 import { ClientOptions, DocumentId, Message, PeerSocketMap, UserName } from './types'
 
 const HEARTBEAT = JSON.stringify({ type: 'Heartbeat' })
 
-interface PeerEventPayload {
+export interface PeerEventPayload {
   userName: UserName
   documentId: DocumentId
   socket: WebSocket
 }
 
-interface ClientEvents {
-  'server.connect': () => void
-  'server.disconnect': () => void
-  'peer.connect': ({ userName, documentId, socket }: PeerEventPayload) => void
-  'peer.disconnect': ({ userName, documentId, socket }: PeerEventPayload) => void
-  error: (ev: Event) => void
-}
+// interface ClientEvents {
+//   'server.connect': () => void
+//   'server.disconnect': () => void
+//   'peer.connect': ({ userName, documentId, socket }: PeerEventPayload) => void
+//   'peer.disconnect': ({ userName, documentId, socket }: PeerEventPayload) => void
+//   error: (ev: Event) => void
+// }
 
 /**
  * This is a client for `relay` that keeps track of all peers that the server connects you to, and
@@ -45,7 +45,8 @@ interface ClientEvents {
  *   })
  * ```
  */
-export class Client extends (EventEmitter as new () => TypedEmitter<ClientEvents>) {
+export class Client extends EventEmitter {
+  //  export class Client extends (EventEmitter as new () => TypedEmitter<ClientEvents>) {
   public userName: UserName
 
   /** The base URL of the relay server */
@@ -59,6 +60,11 @@ export class Client extends (EventEmitter as new () => TypedEmitter<ClientEvents
    * one per documentId that we have in common.) */
   public peers: Map<UserName, PeerSocketMap> = new Map()
 
+  /**
+   * When disconnected, the delay in milliseconds before the next retry
+   */
+  public retryDelay: number
+
   public log: Debugger
 
   /** 
@@ -67,12 +73,12 @@ export class Client extends (EventEmitter as new () => TypedEmitter<ClientEvents
   public open: boolean
 
   private serverConnection: WebSocket
-  private retryDelay: number
 
   private minRetryDelay: number
   private maxRetryDelay: number
   private backoffFactor: number
   private heartbeat: ReturnType<typeof setInterval>
+  private serverConnectionQueue: Message.ClientToServer[] = []
 
   /**
    * @param userName a string that identifies you uniquely, defaults to a UUID
@@ -111,8 +117,8 @@ export class Client extends (EventEmitter as new () => TypedEmitter<ClientEvents
   public join(documentId: DocumentId) {
     this.log('joining', documentId)
     this.documentIds.add(documentId)
-    const message = { type: 'Join', documentIds: [documentId] }
-    this.serverConnection.send(JSON.stringify(message))
+    const message: Message.Join = { type: 'Join', documentIds: [documentId] }
+    this._send(message)
     return this
   }
 
@@ -126,8 +132,8 @@ export class Client extends (EventEmitter as new () => TypedEmitter<ClientEvents
     for (const [userName] of this.peers) {
       this.closeSocket(userName, documentId)
     }
-    const message = { type: 'Leave', documentIds: [documentId] }
-    this.serverConnection.send(JSON.stringify(message))
+    const message: Message.Leave = { type: 'Leave', documentIds: [documentId] }
+    this._send(message)
     return this
   }
 
@@ -191,6 +197,7 @@ export class Client extends (EventEmitter as new () => TypedEmitter<ClientEvents
     socket.onopen = async () => {
       await isReady(socket)
       this.retryDelay = this.minRetryDelay
+      this._drainQueue()
       documentIds.forEach(documentId => this.join(documentId))
       this.emit('server.connect')
       this.open = true
@@ -262,6 +269,21 @@ export class Client extends (EventEmitter as new () => TypedEmitter<ClientEvents
     return this.serverConnection
   }
 
+  private _drainQueue() {
+    while (this.serverConnectionQueue.length) {
+      let message = this.serverConnectionQueue.pop()
+      this._send(message)
+    }
+  }
+
+  private _send(message: Message.ClientToServer) {
+    try {
+      this.serverConnection.send(JSON.stringify(message))
+    } catch (err) {
+      this.serverConnectionQueue.push(message)
+    }
+  }
+
   private closeSocket(userName: UserName, documentId: DocumentId) {
     const peer = this.get(userName)
     if (peer.has(documentId)) {
@@ -275,4 +297,4 @@ export class Client extends (EventEmitter as new () => TypedEmitter<ClientEvents
 
 // It's normal for a document with a lot of participants to have a lot of connections, so increase
 // the limit to avoid spurious warnings about emitter leaks.
-EventEmitter.defaultMaxListeners = 500
+// EventEmitter.defaultMaxListeners = 500

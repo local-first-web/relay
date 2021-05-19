@@ -7,7 +7,7 @@
     "downlevelIteration": true,
     "esModuleInterop": true,
     "lib": ["dom", "esnext"],
-    "module": "commonjs",
+    "module": "ESNext",
     "moduleResolution": "node",
     "noEmit": false,
     "outDir": "dist",
