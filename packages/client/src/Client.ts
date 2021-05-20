@@ -46,22 +46,17 @@ export class Client extends EventEmitter {
   /** All the document IDs we're interested in */
   public documentIds: Set<DocumentId> = new Set()
 
-  /** All the peers we're connected to.
-   * (A 'peer' in this case is actually just a bunch of sockets -
+  /** All the peers we're connected to. (A 'peer' in this case is actually just a bunch of sockets -
    * one per documentId that we have in common.) */
   public peers: Map<UserName, PeerSocketMap> = new Map()
 
-  /**
-   * When disconnected, the delay in milliseconds before the next retry
-   */
+  /** When disconnected, the delay in milliseconds before the next retry */
   public retryDelay: number
 
-  public log: Debugger
-
-  /**
-   * If the connection to the server is currently open
-   */
+  /** Is the connection to the server currently open? */
   public open: boolean
+
+  public log: Debugger
 
   private serverConnection: WebSocket
 
