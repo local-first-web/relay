@@ -91,7 +91,8 @@ export class Client extends EventEmitter {
     // start out at the initial retry delay
     this.retryDelay = minRetryDelay
 
-    this.connectToServer(documentIds)
+    this.connectToServer()
+    documentIds.forEach(id => this.join(id))
   }
 
   /**
@@ -174,7 +175,7 @@ export class Client extends EventEmitter {
    * @param documentIds array of IDs of documents we're interested in
    * @returns the socket connecting us to the server
    */
-  private connectToServer(documentIds: DocumentId[] = []) {
+  private connectToServer() {
     const url = `${this.url}/introduction/${this.userName}`
     this.log('connecting to relay server', url)
 
@@ -184,7 +185,6 @@ export class Client extends EventEmitter {
       await isReady(socket)
       this.retryDelay = this.minRetryDelay
       this.drainQueue()
-      documentIds.forEach(documentId => this.join(documentId))
       this.emit('server.connect')
       this.open = true
 
@@ -238,7 +238,10 @@ export class Client extends EventEmitter {
       clearInterval(this.heartbeat)
 
       // try to reconnect after a delay
-      setTimeout(() => this.connectToServer(documentIds), this.retryDelay)
+      setTimeout(() => {
+        this.connectToServer()
+        this.documentIds.forEach(id => this.join(id))
+      }, this.retryDelay)
 
       // increase the delay for next time
       if (this.retryDelay < this.maxRetryDelay)
@@ -262,7 +265,8 @@ export class Client extends EventEmitter {
     }
   }
 
-  private send(message: Message.ClientToServer) {
+  private async send(message: Message.ClientToServer) {
+    await isReady(this.serverConnection)
     try {
       this.serverConnection.send(JSON.stringify(message))
     } catch (err) {
