@@ -91,90 +91,16 @@ export class Client extends EventEmitter {
     // start out at the initial retry delay
     this.retryDelay = minRetryDelay
 
-    this.connectToServer(documentIds)
+    this.connectToServer()
+    documentIds.forEach(id => this.join(id))
   }
-
-  /**
-   * Lets the server know that you're interested in a document. If there are other peers who have
-   * joined the same DocumentId, you and the remote peer will both receive an introduction message,
-   * inviting you to connect.
-   * @param documentId
-   */
-  public join(documentId: DocumentId) {
-    this.log('joining', documentId)
-    this.documentIds.add(documentId)
-    const message: Message.Join = { type: 'Join', documentIds: [documentId] }
-    this._send(message)
-    return this
-  }
-
-  /**
-   * Leaves a documentId and closes any connections related to it
-   * @param documentId
-   */
-  public leave(documentId: DocumentId) {
-    this.log('leaving', documentId)
-    this.documentIds.delete(documentId)
-    for (const [userName] of this.peers) {
-      this.closeSocket(userName, documentId)
-    }
-    const message: Message.Leave = { type: 'Leave', documentIds: [documentId] }
-    this._send(message)
-    return this
-  }
-
-  /**
-   * Disconnects from one peer
-   * @param peerUserName Name of the peer to disconnect. If none is provided, we disconnect all peers.
-   */
-  public disconnectPeer(peerUserName: UserName) {
-    this.log(`disconnecting from ${peerUserName}`)
-    const peer = this.get(peerUserName)
-    for (const [documentId] of peer) {
-      this.closeSocket(peerUserName, documentId)
-    }
-    return this
-  }
-
-  /**
-   * Disconnects from all peers and from the relay server
-   */
-  public disconnectServer() {
-    this.log(`disconnecting from all peers'}`)
-    const peersToDisconnect = Array.from(this.peers.keys()) // all of them
-    for (const userName of peersToDisconnect) {
-      this.disconnectPeer(userName)
-    }
-    this.removeAllListeners()
-    this.serverConnection.close()
-  }
-
-  public has(peerUserName: UserName, documentId?: DocumentId) {
-    if (documentId !== undefined) {
-      return this.has(peerUserName) && this.peers.get(peerUserName).has(documentId)
-    } else {
-      return this.peers.has(peerUserName)
-    }
-  }
-
-  public get(peerUserName: UserName, documentId?: DocumentId) {
-    if (documentId !== undefined) {
-      return this.get(peerUserName)?.get(documentId)
-    } else {
-      // create an entry for this peer if there isn't already one
-      if (!this.has(peerUserName)) this.peers.set(peerUserName, new Map())
-      return this.peers.get(peerUserName)
-    }
-  }
-
-  // INTERNALS
 
   /**
    * Connects to the relay server, lets it know what documents we're interested in
    * @param documentIds array of IDs of documents we're interested in
    * @returns the socket connecting us to the server
    */
-  private connectToServer(documentIds: DocumentId[] = []) {
+  private connectToServer() {
     const url = `${this.url}/introduction/${this.userName}`
     this.log('connecting to relay server', url)
 
@@ -183,8 +109,7 @@ export class Client extends EventEmitter {
     socket.onopen = async () => {
       await isReady(socket)
       this.retryDelay = this.minRetryDelay
-      this._drainQueue()
-      documentIds.forEach(documentId => this.join(documentId))
+      this.drainQueue()
       this.emit('server.connect')
       this.open = true
 
@@ -238,7 +163,10 @@ export class Client extends EventEmitter {
       clearInterval(this.heartbeat)
 
       // try to reconnect after a delay
-      setTimeout(() => this.connectToServer(documentIds), this.retryDelay)
+      setTimeout(() => {
+        this.connectToServer()
+        this.documentIds.forEach(id => this.join(id))
+      }, this.retryDelay)
 
       // increase the delay for next time
       if (this.retryDelay < this.maxRetryDelay)
@@ -255,14 +183,88 @@ export class Client extends EventEmitter {
     return this.serverConnection
   }
 
-  private _drainQueue() {
-    while (this.serverConnectionQueue.length) {
-      let message = this.serverConnectionQueue.pop()
-      this._send(message)
+  /**
+   * Lets the server know that you're interested in a document. If there are other peers who have
+   * joined the same DocumentId, you and the remote peer will both receive an introduction message,
+   * inviting you to connect.
+   * @param documentId
+   */
+  public join(documentId: DocumentId) {
+    this.log('joining', documentId)
+    this.documentIds.add(documentId)
+    const message: Message.Join = { type: 'Join', documentIds: [documentId] }
+    this.send(message)
+    return this
+  }
+
+  /**
+   * Leaves a documentId and closes any connections related to it
+   * @param documentId
+   */
+  public leave(documentId: DocumentId) {
+    this.log('leaving', documentId)
+    this.documentIds.delete(documentId)
+    for (const [userName] of this.peers) {
+      this.closeSocket(userName, documentId)
+    }
+    const message: Message.Leave = { type: 'Leave', documentIds: [documentId] }
+    this.send(message)
+    return this
+  }
+
+  /**
+   * Disconnects from one peer
+   * @param peerUserName Name of the peer to disconnect. If none is provided, we disconnect all peers.
+   */
+  public disconnectPeer(peerUserName: UserName) {
+    this.log(`disconnecting from ${peerUserName}`)
+    const peer = this.get(peerUserName)
+    for (const [documentId] of peer) {
+      this.closeSocket(peerUserName, documentId)
+    }
+    return this
+  }
+
+  /**
+   * Disconnects from all peers and from the relay server
+   */
+  public disconnectServer() {
+    this.log(`disconnecting from all peers'}`)
+    const peersToDisconnect = Array.from(this.peers.keys()) // all of them
+    for (const userName of peersToDisconnect) {
+      this.disconnectPeer(userName)
+    }
+    this.removeAllListeners()
+    this.serverConnection.close()
+  }
+
+  public has(peerUserName: UserName, documentId?: DocumentId) {
+    if (documentId !== undefined) {
+      return this.has(peerUserName) && this.peers.get(peerUserName).has(documentId)
+    } else {
+      return this.peers.has(peerUserName)
     }
   }
 
-  private _send(message: Message.ClientToServer) {
+  public get(peerUserName: UserName, documentId?: DocumentId) {
+    if (documentId !== undefined) {
+      return this.get(peerUserName)?.get(documentId)
+    } else {
+      // create an entry for this peer if there isn't already one
+      if (!this.has(peerUserName)) this.peers.set(peerUserName, new Map())
+      return this.peers.get(peerUserName)
+    }
+  }
+
+  private drainQueue() {
+    while (this.serverConnectionQueue.length) {
+      let message = this.serverConnectionQueue.pop()
+      this.send(message)
+    }
+  }
+
+  private async send(message: Message.ClientToServer) {
+    await isReady(this.serverConnection)
     try {
       this.serverConnection.send(JSON.stringify(message))
     } catch (err) {
