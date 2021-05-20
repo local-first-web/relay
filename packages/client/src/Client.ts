@@ -104,7 +104,7 @@ export class Client extends EventEmitter {
     this.log('joining', documentId)
     this.documentIds.add(documentId)
     const message: Message.Join = { type: 'Join', documentIds: [documentId] }
-    this._send(message)
+    this.send(message)
     return this
   }
 
@@ -119,7 +119,7 @@ export class Client extends EventEmitter {
       this.closeSocket(userName, documentId)
     }
     const message: Message.Leave = { type: 'Leave', documentIds: [documentId] }
-    this._send(message)
+    this.send(message)
     return this
   }
 
@@ -183,7 +183,7 @@ export class Client extends EventEmitter {
     socket.onopen = async () => {
       await isReady(socket)
       this.retryDelay = this.minRetryDelay
-      this._drainQueue()
+      this.drainQueue()
       documentIds.forEach(documentId => this.join(documentId))
       this.emit('server.connect')
       this.open = true
@@ -255,14 +255,14 @@ export class Client extends EventEmitter {
     return this.serverConnection
   }
 
-  private _drainQueue() {
+  private drainQueue() {
     while (this.serverConnectionQueue.length) {
       let message = this.serverConnectionQueue.pop()
-      this._send(message)
+      this.send(message)
     }
   }
 
-  private _send(message: Message.ClientToServer) {
+  private send(message: Message.ClientToServer) {
     try {
       this.serverConnection.send(JSON.stringify(message))
     } catch (err) {
