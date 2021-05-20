@@ -15,33 +15,15 @@
     "dev": "cross-env DEBUG='lf*' DEBUG_COLORS=1 ts-node-dev src/start.ts --respawn --transpileOnly "
   },
   "dependencies": {
-    "bs58": "4",
     "debug": "4",
     "eventemitter3": "4",
     "express": "4",
     "express-ws": "4",
     "ws": "7"
   },
-  "devDependencies": {
-    "@types/debug": "4",
-    "@types/express": "4",
-    "@types/express-ws": "3",
-    "@types/jest": "26",
-    "@types/node": "14",
-    "@types/ws": "7",
-    "cross-env": "7",
-    "jest": "26",
-    "portfinder": "1",
-    "prettier": "2",
-    "rimraf": "3",
-    "ts-jest": "26",
-    "ts-node-dev": "1",
-    "tslib": "1",
-    "typescript": "4"
-  },
   "jest": {
-    "preset": "ts-jest",
     "testEnvironment": "node",
+    "preset": "ts-jest",
     "testPathIgnorePatterns": [
       "/node_modules/",
       "/dist"
