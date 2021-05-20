@@ -37,6 +37,24 @@ describe('client', () => {
     }
 
     describe('Alice and Bob both join', () => {
+      it('using only .join ', async () => {
+        // Alice and Bob both join a documentId
+        testId += 1
+        const alice = new Client({ userName: `alice-${testId}`, url })
+        const bob = new Client({ userName: `bob-${testId}`, url })
+
+        const documentId = `test-documentId-${testId}`
+        alice.join(documentId)
+        bob.join(documentId)
+
+        await allConnected(alice, bob)
+
+        expect(alice.has(bob.userName, documentId)).toBe(true)
+        expect(bob.has(alice.userName, documentId)).toBe(true)
+      })
+    })
+
+    describe('Alice and Bob both join', () => {
       it('joins a documentId and connects to a peer', async () => {
         // Alice and Bob both join a documentId
         const { alice, bob, documentId } = setup()
@@ -138,6 +156,37 @@ describe('client', () => {
             done()
           }
         })
+      })
+    })
+
+    describe('open', () => {
+      it('stays open when peer disconnects', async done => {
+        const { alice, bob } = setup()
+
+        await allConnected(alice, bob)
+
+        expect(alice.open).toBe(true)
+        expect(bob.open).toBe(true)
+
+        alice.disconnectPeer(bob.userName)
+        expect(alice.open).toBe(true)
+        expect(bob.open).toBe(true)
+        done()
+      })
+
+      it('closes when server disconnects', async done => {
+        const { alice, bob } = setup()
+
+        await allConnected(alice, bob)
+
+        expect(alice.open).toBe(true)
+        expect(bob.open).toBe(true)
+
+        alice.on('server.disconnect', () => {
+          expect(alice.open).toBe(false)
+          done()
+        })
+        server.close()
       })
     })
   })

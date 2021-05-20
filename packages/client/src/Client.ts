@@ -1,6 +1,5 @@
 import debug, { Debugger } from 'debug'
 import { EventEmitter } from './EventEmitter'
-// import TypedEmitter from 'typed-emitter'
 import { isReady } from './isReady'
 import { newid } from './newid'
 import { ClientOptions, DocumentId, Message, PeerSocketMap, UserName } from './types'
@@ -12,14 +11,6 @@ export interface PeerEventPayload {
   documentId: DocumentId
   socket: WebSocket
 }
-
-// interface ClientEvents {
-//   'server.connect': () => void
-//   'server.disconnect': () => void
-//   'peer.connect': ({ userName, documentId, socket }: PeerEventPayload) => void
-//   'peer.disconnect': ({ userName, documentId, socket }: PeerEventPayload) => void
-//   error: (ev: Event) => void
-// }
 
 /**
  * This is a client for `relay` that keeps track of all peers that the server connects you to, and
@@ -55,20 +46,25 @@ export class Client extends EventEmitter {
   /** All the document IDs we're interested in */
   public documentIds: Set<DocumentId> = new Set()
 
-  /** All the peers we're connected to.
-   * (A 'peer' in this case is actually just a bunch of sockets -
+  /** All the peers we're connected to. (A 'peer' in this case is actually just a bunch of sockets -
    * one per documentId that we have in common.) */
   public peers: Map<UserName, PeerSocketMap> = new Map()
+
+  /** When disconnected, the delay in milliseconds before the next retry */
+  public retryDelay: number
+
+  /** Is the connection to the server currently open? */
+  public open: boolean
 
   public log: Debugger
 
   private serverConnection: WebSocket
-  private retryDelay: number
 
   private minRetryDelay: number
   private maxRetryDelay: number
   private backoffFactor: number
   private heartbeat: ReturnType<typeof setInterval>
+  private serverConnectionQueue: Message.ClientToServer[] = []
 
   /**
    * @param userName a string that identifies you uniquely, defaults to a UUID
@@ -107,8 +103,8 @@ export class Client extends EventEmitter {
   public join(documentId: DocumentId) {
     this.log('joining', documentId)
     this.documentIds.add(documentId)
-    const message = { type: 'Join', documentIds: [documentId] }
-    this.serverConnection.send(JSON.stringify(message))
+    const message: Message.Join = { type: 'Join', documentIds: [documentId] }
+    this._send(message)
     return this
   }
 
@@ -122,8 +118,8 @@ export class Client extends EventEmitter {
     for (const [userName] of this.peers) {
       this.closeSocket(userName, documentId)
     }
-    const message = { type: 'Leave', documentIds: [documentId] }
-    this.serverConnection.send(JSON.stringify(message))
+    const message: Message.Leave = { type: 'Leave', documentIds: [documentId] }
+    this._send(message)
     return this
   }
 
@@ -187,8 +183,10 @@ export class Client extends EventEmitter {
     socket.onopen = async () => {
       await isReady(socket)
       this.retryDelay = this.minRetryDelay
+      this._drainQueue()
       documentIds.forEach(documentId => this.join(documentId))
       this.emit('server.connect')
+      this.open = true
 
       this.heartbeat = setInterval(() => socket.send(HEARTBEAT), 5000)
     }
@@ -233,6 +231,7 @@ export class Client extends EventEmitter {
     }
 
     socket.onclose = () => {
+      this.open = false
       this.emit('server.disconnect')
 
       // stop heartbeat
@@ -256,6 +255,21 @@ export class Client extends EventEmitter {
     return this.serverConnection
   }
 
+  private _drainQueue() {
+    while (this.serverConnectionQueue.length) {
+      let message = this.serverConnectionQueue.pop()
+      this._send(message)
+    }
+  }
+
+  private _send(message: Message.ClientToServer) {
+    try {
+      this.serverConnection.send(JSON.stringify(message))
+    } catch (err) {
+      this.serverConnectionQueue.push(message)
+    }
+  }
+
   private closeSocket(userName: UserName, documentId: DocumentId) {
     const peer = this.get(userName)
     if (peer.has(documentId)) {
@@ -266,7 +280,3 @@ export class Client extends EventEmitter {
     }
   }
 }
-
-// It's normal for a document with a lot of participants to have a lot of connections, so increase
-// the limit to avoid spurious warnings about emitter leaks.
-// EventEmitter.defaultMaxListeners = 500
