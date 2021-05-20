@@ -1,4 +1,4 @@
-import { Server } from '@localfirst/relay'
+import { DocumentId, Server } from '@localfirst/relay'
 import { getPortPromise as getAvailablePort } from 'portfinder'
 import { Client } from './Client'
 import { PeerEventPayload } from './types'
@@ -37,24 +37,6 @@ describe('client', () => {
     }
 
     describe('Alice and Bob both join', () => {
-      it('using only .join ', async () => {
-        // Alice and Bob both join a documentId
-        testId += 1
-        const alice = new Client({ userName: `alice-${testId}`, url })
-        const bob = new Client({ userName: `bob-${testId}`, url })
-
-        const documentId = `test-documentId-${testId}`
-        alice.join(documentId)
-        bob.join(documentId)
-
-        await allConnected(alice, bob)
-
-        expect(alice.has(bob.userName, documentId)).toBe(true)
-        expect(bob.has(alice.userName, documentId)).toBe(true)
-      })
-    })
-
-    describe('Alice and Bob both join', () => {
       it('joins a documentId and connects to a peer', async () => {
         // Alice and Bob both join a documentId
         const { alice, bob, documentId } = setup()
@@ -62,6 +44,21 @@ describe('client', () => {
 
         expect(alice.has(bob.userName, documentId)).toBe(true)
         expect(bob.has(alice.userName, documentId)).toBe(true)
+      })
+    })
+
+    describe('Alice and Bob join a document manually', () => {
+      it('both peers have the second document', async () => {
+        const { alice, bob } = setup()
+
+        const anotherDocumentId = 'some-other-document-1234'
+        alice.join(anotherDocumentId)
+        bob.join(anotherDocumentId)
+
+        await allConnected(alice, bob, anotherDocumentId)
+
+        expect(alice.has(bob.userName, anotherDocumentId)).toBe(true)
+        expect(bob.has(alice.userName, anotherDocumentId)).toBe(true)
       })
     })
 
@@ -192,15 +189,21 @@ describe('client', () => {
   })
 })
 
-const allConnected = (a: Client, b: Client) => Promise.all([connection(a, b), connection(b, a)])
+const allConnected = (a: Client, b: Client, documentId?: DocumentId) =>
+  Promise.all([connection(a, b, documentId), connection(b, a, documentId)])
 
 const allDisconnected = (a: Client, b: Client) =>
   Promise.all([disconnection(a, b), disconnection(b, a)])
 
-const connection = (a: Client, b: Client) =>
+const connection = (a: Client, b: Client, documentId?: DocumentId) =>
   new Promise<void>(resolve =>
-    a.on('peer.connect', ({ userName }) => {
-      if (userName === b.userName) resolve()
+    a.on('peer.connect', ({ userName, documentId: d }) => {
+      if (
+        userName === b.userName &&
+        // are we waiting to connect on a specific document ID?
+        (documentId === undefined || documentId === d)
+      )
+        resolve()
     })
   )
 
