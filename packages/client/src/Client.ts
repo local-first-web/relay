@@ -96,81 +96,6 @@ export class Client extends EventEmitter {
   }
 
   /**
-   * Lets the server know that you're interested in a document. If there are other peers who have
-   * joined the same DocumentId, you and the remote peer will both receive an introduction message,
-   * inviting you to connect.
-   * @param documentId
-   */
-  public join(documentId: DocumentId) {
-    this.log('joining', documentId)
-    this.documentIds.add(documentId)
-    const message: Message.Join = { type: 'Join', documentIds: [documentId] }
-    this.send(message)
-    return this
-  }
-
-  /**
-   * Leaves a documentId and closes any connections related to it
-   * @param documentId
-   */
-  public leave(documentId: DocumentId) {
-    this.log('leaving', documentId)
-    this.documentIds.delete(documentId)
-    for (const [userName] of this.peers) {
-      this.closeSocket(userName, documentId)
-    }
-    const message: Message.Leave = { type: 'Leave', documentIds: [documentId] }
-    this.send(message)
-    return this
-  }
-
-  /**
-   * Disconnects from one peer
-   * @param peerUserName Name of the peer to disconnect. If none is provided, we disconnect all peers.
-   */
-  public disconnectPeer(peerUserName: UserName) {
-    this.log(`disconnecting from ${peerUserName}`)
-    const peer = this.get(peerUserName)
-    for (const [documentId] of peer) {
-      this.closeSocket(peerUserName, documentId)
-    }
-    return this
-  }
-
-  /**
-   * Disconnects from all peers and from the relay server
-   */
-  public disconnectServer() {
-    this.log(`disconnecting from all peers'}`)
-    const peersToDisconnect = Array.from(this.peers.keys()) // all of them
-    for (const userName of peersToDisconnect) {
-      this.disconnectPeer(userName)
-    }
-    this.removeAllListeners()
-    this.serverConnection.close()
-  }
-
-  public has(peerUserName: UserName, documentId?: DocumentId) {
-    if (documentId !== undefined) {
-      return this.has(peerUserName) && this.peers.get(peerUserName).has(documentId)
-    } else {
-      return this.peers.has(peerUserName)
-    }
-  }
-
-  public get(peerUserName: UserName, documentId?: DocumentId) {
-    if (documentId !== undefined) {
-      return this.get(peerUserName)?.get(documentId)
-    } else {
-      // create an entry for this peer if there isn't already one
-      if (!this.has(peerUserName)) this.peers.set(peerUserName, new Map())
-      return this.peers.get(peerUserName)
-    }
-  }
-
-  // INTERNALS
-
-  /**
    * Connects to the relay server, lets it know what documents we're interested in
    * @param documentIds array of IDs of documents we're interested in
    * @returns the socket connecting us to the server
@@ -256,6 +181,79 @@ export class Client extends EventEmitter {
 
     this.serverConnection = socket
     return this.serverConnection
+  }
+
+  /**
+   * Lets the server know that you're interested in a document. If there are other peers who have
+   * joined the same DocumentId, you and the remote peer will both receive an introduction message,
+   * inviting you to connect.
+   * @param documentId
+   */
+  public join(documentId: DocumentId) {
+    this.log('joining', documentId)
+    this.documentIds.add(documentId)
+    const message: Message.Join = { type: 'Join', documentIds: [documentId] }
+    this.send(message)
+    return this
+  }
+
+  /**
+   * Leaves a documentId and closes any connections related to it
+   * @param documentId
+   */
+  public leave(documentId: DocumentId) {
+    this.log('leaving', documentId)
+    this.documentIds.delete(documentId)
+    for (const [userName] of this.peers) {
+      this.closeSocket(userName, documentId)
+    }
+    const message: Message.Leave = { type: 'Leave', documentIds: [documentId] }
+    this.send(message)
+    return this
+  }
+
+  /**
+   * Disconnects from one peer
+   * @param peerUserName Name of the peer to disconnect. If none is provided, we disconnect all peers.
+   */
+  public disconnectPeer(peerUserName: UserName) {
+    this.log(`disconnecting from ${peerUserName}`)
+    const peer = this.get(peerUserName)
+    for (const [documentId] of peer) {
+      this.closeSocket(peerUserName, documentId)
+    }
+    return this
+  }
+
+  /**
+   * Disconnects from all peers and from the relay server
+   */
+  public disconnectServer() {
+    this.log(`disconnecting from all peers'}`)
+    const peersToDisconnect = Array.from(this.peers.keys()) // all of them
+    for (const userName of peersToDisconnect) {
+      this.disconnectPeer(userName)
+    }
+    this.removeAllListeners()
+    this.serverConnection.close()
+  }
+
+  public has(peerUserName: UserName, documentId?: DocumentId) {
+    if (documentId !== undefined) {
+      return this.has(peerUserName) && this.peers.get(peerUserName).has(documentId)
+    } else {
+      return this.peers.has(peerUserName)
+    }
+  }
+
+  public get(peerUserName: UserName, documentId?: DocumentId) {
+    if (documentId !== undefined) {
+      return this.get(peerUserName)?.get(documentId)
+    } else {
+      // create an entry for this peer if there isn't already one
+      if (!this.has(peerUserName)) this.peers.set(peerUserName, new Map())
+      return this.peers.get(peerUserName)
+    }
   }
 
   private drainQueue() {
