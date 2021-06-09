@@ -130,6 +130,7 @@ export class Client extends EventEmitter {
       const connectToPeer = (documentId: DocumentId, userName: UserName) => {
         const peer = this.get(userName)
         if (peer.has(documentId)) return // don't add twice
+        peer.set(documentId, { socket: null })
 
         const url = `${this.url}/connection/${this.userName}/${userName}/${documentId}`
         const socket = new WebSocket(url)
@@ -139,8 +140,7 @@ export class Client extends EventEmitter {
           await isReady(socket)
 
           // add the socket to the map for this peer
-          peer.set(documentId, socket)
-
+          peer.set(documentId, { socket })
           this.emit('peer.connect', { userName, documentId, socket })
         }
 
@@ -275,7 +275,7 @@ export class Client extends EventEmitter {
   private closeSocket(userName: UserName, documentId: DocumentId) {
     const peer = this.get(userName)
     if (peer.has(documentId)) {
-      const socket = peer.get(documentId)
+      const { socket }= peer.get(documentId)
       if (socket && socket.readyState !== socket.CLOSED && socket.readyState !== socket.CLOSING)
         socket.close()
       peer.delete(documentId)
