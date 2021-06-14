@@ -260,7 +260,7 @@ export class Client extends EventEmitter {
 
   private drainQueue() {
     while (this.serverConnectionQueue.length) {
-      let message = this.serverConnectionQueue.pop()
+      let message = this.serverConnectionQueue.shift()
       this.send(message)
     }
   }
