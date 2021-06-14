@@ -53,7 +53,7 @@ export interface ClientOptions {
 }
 
 export type Peer = {
-  socket: WebSocket
+  socket: WebSocket | null
 }
 
 export type PeerSocketMap = Map<DocumentId, Peer>
