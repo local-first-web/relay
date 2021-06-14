@@ -277,7 +277,7 @@ export class Client extends EventEmitter {
   private closeSocket(userName: UserName, documentId: DocumentId) {
     const peer = this.get(userName)
     if (peer.has(documentId)) {
-      const { socket }= peer.get(documentId)
+      const { socket } = peer.get(documentId)
       if (socket && socket.readyState !== socket.CLOSED && socket.readyState !== socket.CLOSING)
         socket.close()
       peer.delete(documentId)
