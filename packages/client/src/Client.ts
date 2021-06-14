@@ -2,7 +2,7 @@ import debug, { Debugger } from 'debug'
 import { EventEmitter } from './EventEmitter'
 import { isReady } from './isReady'
 import { newid } from './newid'
-import { ClientOptions, DocumentId, Message, PeerSocketMap, UserName } from './types'
+import { ClientOptions, DocumentId, Message, Peer, PeerSocketMap, UserName } from './types'
 
 const HEARTBEAT = JSON.stringify({ type: 'Heartbeat' })
 
@@ -246,6 +246,8 @@ export class Client extends EventEmitter {
     }
   }
 
+  public get(peerUserName: UserName): PeerSocketMap
+  public get(peerUserName: UserName, documentId: DocumentId): Peer
   public get(peerUserName: UserName, documentId?: DocumentId) {
     if (documentId !== undefined) {
       return this.get(peerUserName)?.get(documentId)
