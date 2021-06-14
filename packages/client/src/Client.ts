@@ -238,7 +238,7 @@ export class Client extends EventEmitter {
     this.serverConnection.close()
   }
 
-  public has(peerUserName: UserName, documentId?: DocumentId) {
+  public has(peerUserName: UserName, documentId?: DocumentId): boolean {
     if (documentId !== undefined) {
       return this.has(peerUserName) && this.peers.get(peerUserName).has(documentId)
     } else {
