@@ -52,8 +52,4 @@ export interface ClientOptions {
   backoffFactor?: number
 }
 
-export type Peer = {
-  socket: WebSocket | null
-}
-
-export type PeerSocketMap = Map<DocumentId, Peer>
+export type PeerSocketMap = Map<DocumentId, WebSocket | null>

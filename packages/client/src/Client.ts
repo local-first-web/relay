@@ -2,7 +2,7 @@ import debug, { Debugger } from 'debug'
 import { EventEmitter } from './EventEmitter'
 import { isReady } from './isReady'
 import { newid } from './newid'
-import { ClientOptions, DocumentId, Message, Peer, PeerSocketMap, UserName } from './types'
+import { ClientOptions, DocumentId, Message, PeerSocketMap, UserName } from './types'
 
 const HEARTBEAT = JSON.stringify({ type: 'Heartbeat' })
 
@@ -130,7 +130,7 @@ export class Client extends EventEmitter {
       const connectToPeer = (documentId: DocumentId, userName: UserName) => {
         const peer = this.get(userName)
         if (peer.has(documentId)) return // don't add twice
-        peer.set(documentId, { socket: null })
+        peer.set(documentId, null)
 
         const url = `${this.url}/connection/${this.userName}/${userName}/${documentId}`
         const socket = new WebSocket(url)
@@ -140,7 +140,7 @@ export class Client extends EventEmitter {
           await isReady(socket)
 
           // add the socket to the map for this peer
-          peer.set(documentId, { socket })
+          peer.set(documentId, socket)
           this.emit('peer.connect', { userName, documentId, socket })
         }
 
@@ -247,7 +247,7 @@ export class Client extends EventEmitter {
   }
 
   public get(peerUserName: UserName): PeerSocketMap
-  public get(peerUserName: UserName, documentId: DocumentId): Peer
+  public get(peerUserName: UserName, documentId: DocumentId): WebSocket | null
   public get(peerUserName: UserName, documentId?: DocumentId) {
     if (documentId !== undefined) {
       return this.get(peerUserName)?.get(documentId)
@@ -277,7 +277,7 @@ export class Client extends EventEmitter {
   private closeSocket(userName: UserName, documentId: DocumentId) {
     const peer = this.get(userName)
     if (peer.has(documentId)) {
-      const { socket } = peer.get(documentId)
+      const socket = peer.get(documentId)
       if (socket && socket.readyState !== socket.CLOSED && socket.readyState !== socket.CLOSING)
         socket.close()
       peer.delete(documentId)
