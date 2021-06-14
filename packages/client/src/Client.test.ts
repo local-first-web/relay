@@ -60,6 +60,29 @@ describe('client', () => {
         expect(alice.has(bob.userName, anotherDocumentId)).toBe(true)
         expect(bob.has(alice.userName, anotherDocumentId)).toBe(true)
       })
+
+      it('emits peer.connect only once per peer connection', async () => {
+        // Alice and Bob both join a documentId
+        testId += 1 
+        let connections = 0;
+        const alice = new Client({ userName: `alice-${testId}`, url })
+
+        alice.on('peer.connect', () => {
+          connections++
+          expect(connections).toBe(1)
+        })
+        const bob = new Client({ userName: `bob-${testId}`, url })
+        const documentId = `test-documentId-${testId}`
+
+        bob.join(documentId)
+        alice.join(documentId)
+        alice.join(documentId)
+
+        await allConnected(alice, bob)
+
+        expect(alice.has(bob.userName, documentId)).toBe(true)
+        expect(bob.has(alice.userName, documentId)).toBe(true)
+      })
     })
 
     describe('Alice leaves a document', () => {
