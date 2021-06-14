@@ -1,6 +1,6 @@
 {
   "name": "@localfirst/relay-client",
-  "version": "3.2.0",
+  "version": "3.3.0",
   "description": "Client for @localfirst/relay",
   "repository": "https://github.com/local-first-web/relay",
   "author": "herb@devresults.com",
