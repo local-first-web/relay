@@ -125,7 +125,7 @@ export class Server extends EventEmitter {
 
     const message = tryParse<Message.ClientToServer>(data.toString())
     if (message instanceof Error) {
-      console.warn({ error: message, data })
+      this.emit('error', { error: message, data })
       return
     }
 
