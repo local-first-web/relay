@@ -113,7 +113,7 @@ export class Server extends EventEmitter {
   private openIntroductionConnection(socket: WebSocket, userName: UserName) {
     this.peers[userName] = socket
 
-    socket.on('message', () => {try {this.handleIntroductionRequest(userName)} catch(e) {return}})
+    socket.on('message', this.handleIntroductionRequest(userName))
     socket.on('close', this.closeIntroductionConnection(userName))
 
     this.emit('introductionConnection', userName)
@@ -121,9 +121,13 @@ export class Server extends EventEmitter {
 
   private handleIntroductionRequest = (userName: UserName) => (data: any) => {
     const A = userName // A and B always refer to peer userNames
-    const message = JSON.parse(data.toString()) as Message.ClientToServer
-
     const currentDocumentIds = this.documentIds[A] ?? []
+
+    const message = tryParse<Message.ClientToServer>(data.toString())
+    if (message instanceof Error) {
+      console.warn({ error: message, data })
+      return
+    }
 
     switch (message.type) {
       case 'Heartbeat':
@@ -217,5 +221,13 @@ export class Server extends EventEmitter {
         .on('message', holdMessage)
         .on('close', () => delete this.holding[AseeksB])
     }
+  }
+}
+
+const tryParse = <T>(s: string): T | Error => {
+  try {
+    return JSON.parse(s)
+  } catch (err) {
+    return err
   }
 }
