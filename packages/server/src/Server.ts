@@ -228,6 +228,9 @@ const tryParse = <T>(s: string): T | Error => {
   try {
     return JSON.parse(s)
   } catch (err) {
+    if (err instanceof SyntaxError) {
+      return new SyntaxError('Message is not valid JSON')
+    }
     return err
   }
 }
