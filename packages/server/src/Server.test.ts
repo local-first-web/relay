@@ -62,6 +62,45 @@ describe('Server', () => {
       const alice = new WebSocket(`${url}/introduction/${aliceId}`)
     })
 
+    it('should not crash when sent malformed JSON', done => {
+      const { aliceId, bobId, documentId } = setup()
+
+      const alice = requestIntroduction(aliceId, documentId)
+
+      // Bob's behavior will be non-standard so we'll drive it by hand
+      const bob = new WebSocket(`${url}/introduction/${bobId}`)
+
+      const badMessage = '{╯°□°}╯︵ ┻━┻' // 🡐 not valid JSON
+
+      bob.on('open', () => {
+        // Bob sends an invalid message
+        bob.send(badMessage)
+
+        // No servers are harmed
+
+        // Bob then sends a valid join message
+        bob.send(
+          JSON.stringify({
+            type: 'Join',
+            documentIds: [documentId],
+          })
+        )
+
+        // The bad message didn't kill the server - Bob gets a response back
+        bob.on('message', data => {
+          const msg = JSON.parse(data.toString())
+          expect(msg.type).toBe('Introduction')
+          done()
+        })
+      })
+
+      // We expect the server to emit an error event on Bob's bad message
+      server.once('error', payload => {
+        expect(payload.error.toString()).toMatch(/SyntaxError/)
+        expect(payload.data).toEqual(badMessage)
+      })
+    })
+
     it('should invite peers to connect', async () => {
       const { aliceId, bobId, documentId } = setup()
       const alice = requestIntroduction(aliceId, documentId)
