@@ -113,7 +113,7 @@ export class Server extends EventEmitter {
   private openIntroductionConnection(socket: WebSocket, userName: UserName) {
     this.peers[userName] = socket
 
-    socket.on('message', this.handleIntroductionRequest(userName))
+    socket.on('message', () => {try {this.handleIntroductionRequest(userName)} catch(e) {return}})
     socket.on('close', this.closeIntroductionConnection(userName))
 
     this.emit('introductionConnection', userName)
