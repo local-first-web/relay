@@ -163,7 +163,7 @@ describe('Server', () => {
       let introductions = 0
       const peers = ['a', 'b', 'c', 'd', 'e']
 
-      const expectedIntroductions = factorial(peers.length) / factorial(peers.length - 2) // Permutations of 2
+      const expectedIntroductions = permutationsOfTwo(peers.length)
 
       const userNames = peers.map(userName => `peer-${userName}-${testId}`)
 
@@ -197,16 +197,11 @@ describe('Server', () => {
 
       const userNames = peers.map(userName => `peer-${userName}-${testId}`)
 
-      const expectedIntroductions = 4
+      const expectedIntroductions = permutationsOfTwo(peers.length - 1) // one will misbehave
 
       const sockets = userNames.map(userName => new WebSocket(`${url}/introduction/${userName}`))
 
-      sockets.forEach((socket: WebSocket) => {
-
-        socket.onopen = () => {
-          socket.send('malicious client can crash you :)')
-        }
-
+      sockets.forEach(socket => {
         socket.onmessage = event => {
           const { data } = event
           const message = JSON.parse(data.toString())
@@ -228,4 +223,5 @@ describe('Server', () => {
   })
 })
 
+const permutationsOfTwo = (n: number) => factorial(n) / factorial(n - 2)
 const factorial = (n: number): number => (n === 1 ? 1 : n * factorial(n - 1))
