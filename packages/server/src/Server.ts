@@ -161,7 +161,7 @@ export class Server extends EventEmitter {
     }
   }
 
-  private _send(peer: WebSocket, message: Message.ServerToClient) {
+  private send(peer: WebSocket, message: Message.ServerToClient) {
     if (peer && peer.readyState === WebSocket.OPEN) {
       try {
         peer.send(JSON.stringify(message))
@@ -180,7 +180,7 @@ export class Server extends EventEmitter {
       documentIds, // the documentId(s) both are interested in
     }
     let peer = this.peers[A]
-    this._send(peer, message)
+    this.send(peer, message)
   }
 
   private closeIntroductionConnection = (userName: UserName) => () => {
@@ -208,7 +208,7 @@ export class Server extends EventEmitter {
 
       this.log(`found peer, connecting ${AseeksB} (${messages.length} stored messages)`)
       // Send any stored messages
-      messages.forEach(message => this._send(socket, message))
+      messages.forEach(message => this.send(socket, message))
 
       // Pipe the two sockets together
       pipeSockets(socketA, socketB)
