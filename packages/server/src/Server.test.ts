@@ -189,10 +189,8 @@ describe('Server', () => {
         }
       })
     })
-  })
 
-  describe('Handle errors gracefully', () => {
-    it('Should not crash when peer disconnects mid-introduction', done => {
+    it('Should not crash when one peer disconnects mid-introduction', done => {
       const { documentId } = setup()
       let introductions = 0
       const peers = ['a', 'b', 'c', 'd', 'e']
