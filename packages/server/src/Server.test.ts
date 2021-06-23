@@ -202,7 +202,7 @@ describe('Server', () => {
       let introductions = 0
       const peers = ['a', 'b', 'c', 'd', 'e']
 
-      const expectedIntroductions = factorial(peers.length) / factorial(peers.length - 2) // Permutations of 2
+      const expectedIntroductions = permutationsOfTwo(peers.length)
 
       const userNames = peers.map(userName => `peer-${userName}-${testId}`)
 
@@ -228,7 +228,39 @@ describe('Server', () => {
         }
       })
     })
+
+    it('Should not crash when one peer disconnects mid-introduction', done => {
+      const { documentId } = setup()
+      let introductions = 0
+      const peers = ['a', 'b', 'c', 'd', 'e']
+
+      const userNames = peers.map(userName => `peer-${userName}-${testId}`)
+
+      const expectedIntroductions = permutationsOfTwo(peers.length - 1) // one will misbehave
+
+      const sockets = userNames.map(userName => new WebSocket(`${url}/introduction/${userName}`))
+
+      sockets.forEach(socket => {
+        socket.onmessage = event => {
+          const { data } = event
+          const message = JSON.parse(data.toString())
+          expect(message.type).toBe('Introduction')
+
+          introductions += 1
+          if (introductions === expectedIntroductions) done()
+        }
+      })
+
+      const joinMessage = { type: 'Join', documentIds: [documentId] }
+      sockets.forEach(async (socket, i) => {
+        socket.onopen = () => {
+          socket.send(JSON.stringify(joinMessage))
+          if (i === 0) socket.close()
+        }
+      })
+    })
   })
 })
 
+const permutationsOfTwo = (n: number) => factorial(n) / factorial(n - 2)
 const factorial = (n: number): number => (n === 1 ? 1 : n * factorial(n - 1))
