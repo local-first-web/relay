@@ -220,10 +220,10 @@ describe('Server', () => {
       })
 
       const joinMessage = { type: 'Join', documentIds: [documentId] }
-      sockets.forEach(async (socket: WebSocket) => {
+      sockets.forEach(async (socket, i) => {
         socket.onopen = () => {
           socket.send(JSON.stringify(joinMessage))
-          if (introductions === 0) socket.close()
+          if (i === 0) socket.close()
         }
       })
     })
