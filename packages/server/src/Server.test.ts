@@ -201,9 +201,7 @@ describe('Server', () => {
 
       const expectedIntroductions = 4
 
-      const sockets = userNames.map(
-        (userName: string) => new WebSocket(`${url}/introduction/${userName}`)
-      )
+      const sockets = userNames.map(userName => new WebSocket(`${url}/introduction/${userName}`))
 
       sockets.forEach((socket: WebSocket) => {
 
