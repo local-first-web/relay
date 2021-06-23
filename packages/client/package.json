@@ -1,6 +1,6 @@
 {
   "name": "@localfirst/relay-client",
-  "version": "3.4.0",
+  "version": "3.5.0",
   "description": "Client for @localfirst/relay",
   "repository": "https://github.com/local-first-web/relay",
   "author": "herb@devresults.com",
@@ -20,7 +20,7 @@
     "eventemitter3": "4"
   },
   "devDependencies": {
-    "@localfirst/relay": "^3.4.0"
+    "@localfirst/relay": "^3.5.0"
   },
   "jest": {
     "testEnvironment": "jsdom",
