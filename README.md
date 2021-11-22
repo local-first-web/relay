@@ -184,6 +184,6 @@ Formerly known as 🐟 Cevitxe Signal Server. (Cevitxe is now [@localfirst/state
 
 [@localfirst/state]: https://github.com/local-first-web/state
 [@localfirst/auth]: https://github.com/local-first-web/auth
-[@localfirst/relay-client]: ./packages/relay-client/README.md
+[@localfirst/relay-client]: ./packages/client/
 [relay-deployable]: https://github.com/local-first-web/relay-deployable
 [server tests]: ./packages/relay/src/Server.test.ts
