@@ -5,6 +5,7 @@ import { newid } from './newid'
 import { ClientOptions, DocumentId, Message, PeerSocketMap, UserName } from './types'
 
 const HEARTBEAT = JSON.stringify({ type: 'Heartbeat' })
+const HEARTBEAT_INTERVAL = 55000 // 55 seconds
 
 export interface PeerEventPayload {
   userName: UserName
@@ -60,6 +61,9 @@ export class Client extends EventEmitter {
 
   private serverConnection: WebSocket
 
+  /** If the connection is closed, do we want to reopen it? */
+  private shouldReopenIfClosed: boolean = true
+
   private minRetryDelay: number
   private maxRetryDelay: number
   private backoffFactor: number
@@ -104,19 +108,20 @@ export class Client extends EventEmitter {
     const url = `${this.url}/introduction/${this.userName}`
     this.log('connecting to relay server', url)
 
-    const socket = new WebSocket(url)
+    const serverConnection = new WebSocket(url)
 
-    socket.onopen = async () => {
-      await isReady(socket)
+    serverConnection.onopen = async () => {
+      await isReady(serverConnection)
       this.retryDelay = this.minRetryDelay
+      this.shouldReopenIfClosed = true
       this.drainQueue()
       this.emit('server.connect')
       this.open = true
 
-      this.heartbeat = setInterval(() => socket.send(HEARTBEAT), 5000)
+      this.heartbeat = setInterval(() => serverConnection.send(HEARTBEAT), HEARTBEAT_INTERVAL)
     }
 
-    socket.onmessage = messageEvent => {
+    serverConnection.onmessage = messageEvent => {
       const { data } = messageEvent
       const message = JSON.parse(data.toString()) as Message.ServerToClient
 
@@ -133,21 +138,29 @@ export class Client extends EventEmitter {
         peer.set(documentId, null)
 
         const url = `${this.url}/connection/${this.userName}/${userName}/${documentId}`
-        const socket = new WebSocket(url)
+        const peerConnection = new WebSocket(url)
 
-        socket.onopen = async () => {
+        peerConnection.onopen = async () => {
           // make sure the socket is actually in READY state
-          await isReady(socket)
+          await isReady(peerConnection)
 
           // add the socket to the map for this peer
-          peer.set(documentId, socket)
-          this.emit('peer.connect', { userName, documentId, socket })
+          peer.set(documentId, peerConnection)
+          this.emit('peer.connect', {
+            userName,
+            documentId,
+            socket: peerConnection,
+          } as PeerEventPayload)
         }
 
         // if the other end disconnects, we disconnect
-        socket.onclose = () => {
+        peerConnection.onclose = () => {
           this.closeSocket(userName, documentId)
-          this.emit('peer.disconnect', { userName, documentId, socket })
+          this.emit('peer.disconnect', {
+            userName,
+            documentId,
+            socket: peerConnection,
+          } as PeerEventPayload)
         }
       }
 
@@ -155,32 +168,36 @@ export class Client extends EventEmitter {
       documentIds.forEach(documentId => connectToPeer(documentId, userName))
     }
 
-    socket.onclose = () => {
+    serverConnection.onclose = () => {
       this.open = false
       this.emit('server.disconnect')
 
       // stop heartbeat
       clearInterval(this.heartbeat)
 
-      // try to reconnect after a delay
-      setTimeout(() => {
-        this.connectToServer()
-        this.documentIds.forEach(id => this.join(id))
-      }, this.retryDelay)
-
-      // increase the delay for next time
-      if (this.retryDelay < this.maxRetryDelay)
-        this.retryDelay *= this.backoffFactor + Math.random() * 0.1 - 0.05 // randomly vary the delay
-
-      this.log(`Relay connection closed. Retrying in ${Math.floor(this.retryDelay / 1000)}s`)
+      if (this.shouldReopenIfClosed) this.tryToReopen()
     }
 
-    socket.onerror = (ev: Event) => {
+    serverConnection.onerror = (ev: Event) => {
       this.emit('error', ev)
     }
 
-    this.serverConnection = socket
+    this.serverConnection = serverConnection
     return this.serverConnection
+  }
+
+  /** Try to reconnect after a delay  */
+  private tryToReopen() {
+    setTimeout(() => {
+      this.connectToServer()
+      this.documentIds.forEach(id => this.join(id))
+    }, this.retryDelay)
+
+    // increase the delay for next time
+    if (this.retryDelay < this.maxRetryDelay)
+      this.retryDelay *= this.backoffFactor + Math.random() * 0.1 - 0.05 // randomly vary the delay
+
+    this.log(`Relay connection closed. Retrying in ${Math.floor(this.retryDelay / 1000)}s`)
   }
 
   /**
@@ -229,7 +246,11 @@ export class Client extends EventEmitter {
    * Disconnects from all peers and from the relay server
    */
   public disconnectServer() {
-    this.log(`disconnecting from all peers'}`)
+    this.log(`disconnecting from all peers`)
+
+    /** Don't automatically try to reopen */
+    this.shouldReopenIfClosed = false
+
     const peersToDisconnect = Array.from(this.peers.keys()) // all of them
     for (const userName of peersToDisconnect) {
       this.disconnectPeer(userName)
