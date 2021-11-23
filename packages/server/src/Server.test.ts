@@ -1,6 +1,6 @@
 import { Server } from './Server'
 import { getPortPromise as getAvailablePort } from 'portfinder'
-import { Message } from 'types'
+import { Message } from './types'
 import WebSocket from 'ws'
 
 // const log = debug('lf:relay:tests')

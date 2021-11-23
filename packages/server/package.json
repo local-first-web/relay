@@ -6,11 +6,12 @@
   "author": "herb@devresults.com",
   "license": "MIT",
   "private": false,
-  "main": "dist/index.js",
+  "main": "dist/src/index.js",
+  "types": "dist/src/index.d.ts",
   "scripts": {
     "prebuild": "rimraf dist",
     "build": "tsc",
-    "start": "node dist/start.js",
+    "start": "node dist/src/start.js",
     "test": "jest",
     "dev": "cross-env DEBUG='lf*' DEBUG_COLORS=1 ts-node-dev src/start.ts --respawn --transpileOnly "
   },

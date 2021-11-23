@@ -3,7 +3,9 @@ import { EventEmitter } from './EventEmitter'
 import { isReady } from './isReady'
 import { newid } from './newid'
 import { ClientOptions, DocumentId, Message, PeerSocketMap, UserName } from './types'
+import pkg from '../package.json'
 
+const { version } = pkg
 const HEARTBEAT = JSON.stringify({ type: 'Heartbeat' })
 const HEARTBEAT_INTERVAL = 55000 // 55 seconds
 
@@ -85,6 +87,7 @@ export class Client extends EventEmitter {
   }: ClientOptions) {
     super()
     this.log = debug(`lf:relay:client:${userName}`)
+    this.log('version', version)
 
     this.userName = userName
     this.url = url
@@ -104,7 +107,7 @@ export class Client extends EventEmitter {
    * @param documentIds array of IDs of documents we're interested in
    * @returns the socket connecting us to the server
    */
-  private connectToServer() {
+  public connectToServer() {
     const url = `${this.url}/introduction/${this.userName}`
     this.log('connecting to relay server', url)
 

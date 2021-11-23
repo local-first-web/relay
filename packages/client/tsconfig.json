@@ -10,11 +10,14 @@
     "module": "ESNext",
     "moduleResolution": "node",
     "noEmit": false,
-    "outDir": "dist",
-    "rootDir": ".",
+    "outDir": "./dist",
+    "preserveSymlinks": true,
+    "resolveJsonModule": true,
     "skipLibCheck": true,
     "sourceMap": true,
     "target": "es5",
-    "preserveSymlinks": true
-  }
+    "useUnknownInCatchVariables": false
+  },
+  "exclude": ["*.test.ts"],
+  "include": ["src", "package.json"]
 }

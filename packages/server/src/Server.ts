@@ -1,13 +1,16 @@
 import debug from 'debug'
-import { EventEmitter } from './EventEmitter'
 import express from 'express'
 import expressWs from 'express-ws'
-import WebSocket from 'ws'
 import { Server as HttpServer, Socket } from 'net'
+import WebSocket from 'ws'
+import pkg from '../package.json'
 import { deduplicate } from './deduplicate'
+import { EventEmitter } from './EventEmitter'
 import { intersection } from './intersection'
-import { UserName, ConnectRequestParams, DocumentId, Message } from './types'
 import { pipeSockets } from './pipeSockets'
+import { ConnectRequestParams, DocumentId, Message, UserName } from './types'
+
+const { version } = pkg
 
 const { app } = expressWs(express())
 
@@ -62,6 +65,7 @@ export class Server extends EventEmitter {
   constructor({ port = 8080 } = {}) {
     super()
     this.log = debug(`lf:relay:${port}`)
+    this.log('version', version)
     this.port = port
   }
 
@@ -132,7 +136,7 @@ export class Server extends EventEmitter {
     switch (message.type) {
       case 'Heartbeat':
         // nothing to do
-        this.log('♥')
+        this.log('♥', userName)
         break
 
       case 'Join':
