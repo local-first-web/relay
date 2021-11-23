@@ -63,8 +63,8 @@ describe('client', () => {
 
       it('emits peer.connect only once per peer connection', async () => {
         // Alice and Bob both join a documentId
-        testId += 1 
-        let connections = 0;
+        testId += 1
+        let connections = 0
         const alice = new Client({ userName: `alice-${testId}`, url })
 
         alice.on('peer.connect', () => {
@@ -152,6 +152,7 @@ describe('client', () => {
         expect(bob.has(alice.userName, documentId)).toBe(false)
 
         // Alice reconnects
+        alice.connectToServer()
         alice.join(documentId)
         await allConnected(alice, bob)
 
