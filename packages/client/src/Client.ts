@@ -62,7 +62,7 @@ export class Client extends EventEmitter {
   private serverConnection: WebSocket
 
   /** If the connection is closed, do we want to reopen it? */
-  private shouldReopenIfClosed: boolean = true
+  private shouldReconnectIfClosed: boolean = true
 
   private minRetryDelay: number
   private maxRetryDelay: number
@@ -113,7 +113,7 @@ export class Client extends EventEmitter {
     serverConnection.onopen = async () => {
       await isReady(serverConnection)
       this.retryDelay = this.minRetryDelay
-      this.shouldReopenIfClosed = true
+      this.shouldReconnectIfClosed = true
       this.drainQueue()
       this.emit('server.connect')
       this.open = true
@@ -175,7 +175,7 @@ export class Client extends EventEmitter {
       // stop heartbeat
       clearInterval(this.heartbeat)
 
-      if (this.shouldReopenIfClosed) this.tryToReopen()
+      if (this.shouldReconnectIfClosed) this.tryToReopen()
     }
 
     serverConnection.onerror = (ev: Event) => {
@@ -248,8 +248,8 @@ export class Client extends EventEmitter {
   public disconnectServer() {
     this.log(`disconnecting from all peers`)
 
-    /** Don't automatically try to reopen */
-    this.shouldReopenIfClosed = false
+    // Don't automatically try to reconnect after deliberately disconnecting
+    this.shouldReconnectIfClosed = false
 
     const peersToDisconnect = Array.from(this.peers.keys()) // all of them
     for (const userName of peersToDisconnect) {
