@@ -1,6 +1,6 @@
 {
   "name": "@localfirst/relay",
-  "version": "3.5.1",
+  "version": "3.6.0",
   "description": "A tiny service that helps local-first applications connect with peers on other devices",
   "repository": "https://github.com/local-first-web/relay",
   "author": "herb@devresults.com",
