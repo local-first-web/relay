@@ -172,7 +172,7 @@ export class Server extends EventEmitter {
   private send(peer: WebSocket, message: Message.ServerToClient) {
     if (peer && peer.readyState === WebSocket.OPEN) {
       try {
-        peer.send(JSON.stringify(message))
+        peer.send(message)
       } catch (err) {
         console.error('Failed to send message to peer')
       }
