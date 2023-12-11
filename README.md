@@ -142,7 +142,7 @@ This server has two WebSocket endpoints: `introduction` and `connection`.
   ```ts
   {
     type: 'Join',
-    join: ['ambitious-mongoose', 'frivolous-platypus'], // documents I have or am interested in
+    documentIds: ['ambitious-mongoose', 'frivolous-platypus'], // documents I have or am interested in
   }
   ```
 
