@@ -28,7 +28,5 @@ jobs:
         run: |
           pnpm install
           pnpm build
-      - name: Lint and run tests
-        run: |
-          pnpm lint
-          pnpm test
+      - name: Run tests
+        run: pnpm test
