@@ -1,9 +1,9 @@
 import { getPortPromise as getAvailablePort } from "portfinder"
 import { describe, expect, it } from "vitest"
-import { Client } from "./Client.js"
-import { eventPromise } from "./eventPromise.js"
-import { DocumentId, Server } from "./index.js"
-import { PeerEventPayload } from "./types.js"
+import { Client } from "../Client.js"
+import { eventPromise } from "../lib/eventPromise.js"
+import { DocumentId, Server } from "../index.js"
+import { PeerEventPayload } from "../lib/types.js"
 
 describe("client", () => {
   let testId: number = 0

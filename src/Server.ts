@@ -5,11 +5,16 @@ import WebSocket from "isomorphic-ws"
 import { pack, unpack } from "msgpackr"
 import { Server as HttpServer, Socket } from "net"
 import pkg from "../package.json"
-import { EventEmitter } from "./EventEmitter.js"
-import { deduplicate } from "./deduplicate.js"
-import { intersection } from "./intersection.js"
-import { pipeSockets } from "./pipeSockets.js"
-import { ConnectRequestParams, DocumentId, Message, UserName } from "./types.js"
+import { EventEmitter } from "./lib/EventEmitter.js"
+import { deduplicate } from "./lib/deduplicate.js"
+import { intersection } from "./lib/intersection.js"
+import { pipeSockets } from "./lib/pipeSockets.js"
+import {
+  ConnectRequestParams,
+  DocumentId,
+  Message,
+  UserName,
+} from "./lib/types.js"
 
 /**
  * This server provides two services:

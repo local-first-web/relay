@@ -1,12 +1,12 @@
 import { getPortPromise as getAvailablePort } from "portfinder"
 import { afterAll, beforeAll, describe, expect, it } from "vitest"
 import WebSocket from "isomorphic-ws"
-import { Server } from "./Server.js"
-import type { Message } from "./types.js"
-import { eventPromise, eventPromises } from "./eventPromise.js"
-import { pack, unpack } from "./msgpack.js"
-import { pause } from "./pause.js"
-import { isReady } from "./isReady.js"
+import { Server } from "../Server.js"
+import type { Message } from "../lib/types.js"
+import { eventPromise, eventPromises } from "../lib/eventPromise.js"
+import { pack, unpack } from "../lib/msgpack.js"
+import { pause } from "../lib/pause.js"
+import { isReady } from "../lib/isReady.js"
 
 // const log = debug('lf:relay:tests')
 

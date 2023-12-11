@@ -1,17 +1,17 @@
 import debug, { Debugger } from "debug"
 import WebSocket, { ErrorEvent } from "isomorphic-ws"
-import { pack, unpack } from "./msgpack.js"
+import { pack, unpack } from "./lib/msgpack.js"
 import pkg from "../package.json"
-import { EventEmitter } from "./EventEmitter.js"
-import { isReady } from "./isReady.js"
-import { newid } from "./newid.js"
+import { EventEmitter } from "./lib/EventEmitter.js"
+import { isReady } from "./lib/isReady.js"
+import { newid } from "./lib/newid.js"
 import type {
   ClientOptions,
   DocumentId,
   Message,
   PeerSocketMap,
   UserName,
-} from "./types.js"
+} from "./lib/types.js"
 
 const { version } = pkg
 const HEARTBEAT = pack({ type: "Heartbeat" })
