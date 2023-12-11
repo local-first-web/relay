@@ -1,56 +1,42 @@
 {
-  "name": "@localfirst/relay-monorepo",
-  "version": "0.0.0",
-  "description": "Monorepo containing @localfirst/relay and @localfirst/relay-client",
+  "name": "@localfirst/relay",
+  "version": "4.0.0",
+  "description": "A tiny service that helps local-first applications connect with peers on other devices",
   "repository": "https://github.com/local-first-web/relay",
   "author": "herb@devresults.com",
   "license": "MIT",
-  "private": true,
+  "type": "module",
+  "private": false,
   "scripts": {
-    "build": "lerna run build",
-    "start": "yarn workspace @localfirst/relay start",
-    "start:log": "cross-env DEBUG='lf*' DEBUG_COLORS=1 yarn start",
-    "dev": "yarn workspace @localfirst/relay dev",
-    "pub": "lerna publish --yes",
-    "test": "jest",
-    "test:log": "cross-env DEBUG='lf*' DEBUG_COLORS=1 yarn test"
+    "prebuild": "rimraf dist",
+    "build": "tsc -p tsconfig.build.json",
+    "dev": "cross-env DEBUG='lf*' DEBUG_COLORS=1 ts-node-dev src/start.ts --respawn --transpileOnly",
+    "start": "node dist/start.js",
+    "start:log": "cross-env DEBUG='lf*' DEBUG_COLORS=1 pnpm start",
+    "test": "vitest",
+    "test:log": "cross-env DEBUG='lf*' DEBUG_COLORS=1 pnpm test"
+  },
+  "dependencies": {
+    "cuid": "^3.0.0",
+    "debug": "^4.3.4",
+    "eventemitter3": "^5.0.1",
+    "express": "^4.18.2",
+    "express-ws": "^5.0.2",
+    "isomorphic-ws": "^5.0.0",
+    "msgpackr": "^1.10.0"
   },
   "devDependencies": {
-    "@types/debug": "4",
-    "@types/express": "4",
-    "@types/express-ws": "3",
-    "@types/jest": "26",
-    "@types/node": "14",
-    "@types/ws": "7",
-    "cross-env": "7",
-    "jest": "26",
-    "lerna": "3",
-    "portfinder": "1",
-    "rimraf": "3",
-    "ts-jest": "26",
-    "ts-node-dev": "1",
-    "typescript": "4"
-  },
-  "workspaces": {
-    "packages": [
-      "packages/*"
-    ],
-    "nohoist": [
-      "**/jest/**",
-      "**/jest"
-    ]
-  },
-  "prettier": {
-    "printWidth": 100,
-    "semi": false,
-    "singleQuote": true,
-    "arrowParens": "avoid",
-    "trailingComma": "es5"
-  },
-  "jest": {
-    "projects": [
-      "<rootDir>/packages/client",
-      "<rootDir>/packages/server"
-    ]
+    "@types/debug": "^4.1.12",
+    "@types/express": "^4.17.21",
+    "@types/express-ws": "^3.0.4",
+    "@types/node": "^20.10.4",
+    "prettier": "^3.1.1",
+    "cross-env": "^7.0.3",
+    "lerna": "^8.0.0",
+    "portfinder": "^1.0.32",
+    "rimraf": "^5.0.5",
+    "ts-node-dev": "^2.0.0",
+    "typescript": "^5.3.3",
+    "vitest": "^1.0.0"
   }
 }

@@ -1,27 +1,15 @@
-import debug from 'debug'
-import express from 'express'
-import expressWs from 'express-ws'
-import { Server as HttpServer, Socket } from 'net'
-import WebSocket from 'ws'
-import pkg from '../package.json'
-import { deduplicate } from './deduplicate'
-import { EventEmitter } from './EventEmitter'
-import { intersection } from './intersection'
-import { pipeSockets } from './pipeSockets'
-import { ConnectRequestParams, DocumentId, Message, UserName } from './types'
-
-const { version } = pkg
-
-const { app } = expressWs(express())
-
-const logoPage = `
-  <body style="background:black; display:flex; justify-content:center; align-items:center">
-    <img src="https://raw.githubusercontent.com/local-first-web/branding/main/svg/relay-v.svg" width="50%" alt="@localfirst/relay logo"/>
-  </body>`
-
-interface ListenOptions {
-  silent?: boolean
-}
+import debug from "debug"
+import express from "express"
+import expressWs from "express-ws"
+import WebSocket from "isomorphic-ws"
+import { pack, unpack } from "msgpackr"
+import { Server as HttpServer, Socket } from "net"
+import pkg from "../package.json"
+import { EventEmitter } from "./EventEmitter.js"
+import { deduplicate } from "./deduplicate.js"
+import { intersection } from "./intersection.js"
+import { pipeSockets } from "./pipeSockets.js"
+import { ConnectRequestParams, DocumentId, Message, UserName } from "./types.js"
 
 /**
  * This server provides two services:
@@ -65,7 +53,7 @@ export class Server extends EventEmitter {
   constructor({ port = 8080 } = {}) {
     super()
     this.log = debug(`lf:relay:${port}`)
-    this.log('version', version)
+    this.log("version", version)
     this.port = port
   }
 
@@ -74,27 +62,31 @@ export class Server extends EventEmitter {
   listen({ silent = false }: ListenOptions = {}) {
     return new Promise<void>((resolve, reject) => {
       // Allow hitting this server from a browser as a sanity check
-      app.get('/', (_, res) => res.send(logoPage).end())
+      app.get("/", (_, res) => res.send(logoPage).end())
 
       // Introduction request
-      app.ws('/introduction/:userName', (ws, { params: { userName } }) => {
-        this.log('received introduction request', userName)
+      app.ws("/introduction/:userName", (ws, { params: { userName } }) => {
+        this.log("received introduction request", userName)
         this.openIntroductionConnection(ws, userName)
       })
 
       // Connection request
-      app.ws('/connection/:A/:B/:documentId', (ws, { params: { A, B, documentId } }) => {
-        this.log('received connection request', A, B)
-        this.openConnection({ socket: ws, A, B, documentId })
-      })
+      app.ws(
+        "/connection/:A/:B/:documentId",
+        (ws, { params: { A, B, documentId } }) => {
+          this.log("received connection request", A, B)
+          this.openConnection({ socket: ws, A, B, documentId })
+        }
+      )
 
       this.httpServer = app
         .listen(this.port, () => {
-          if (!silent) console.log(`🐟 ⯁ Listening at http://localhost:${this.port}`)
-          this.emit('ready')
+          if (!silent)
+            console.log(`🐟 ⯁ Listening at http://localhost:${this.port}`)
+          this.emit("ready")
           resolve()
         })
-        .on('connection', socket => {
+        .on("connection", socket => {
           // keep track of sockets for cleanup
           this.httpSockets.push(socket)
         })
@@ -102,13 +94,13 @@ export class Server extends EventEmitter {
   }
 
   close() {
-    this.log('attempting httpServer.close')
+    this.log("attempting httpServer.close")
     this.httpSockets.forEach(socket => {
       socket.end()
       socket.destroy()
     })
     return this.httpServer?.close(() => {
-      this.emit('close')
+      this.emit("close")
     })
   }
 
@@ -117,73 +109,86 @@ export class Server extends EventEmitter {
   private openIntroductionConnection(socket: WebSocket, userName: UserName) {
     this.peers[userName] = socket
 
-    socket.on('message', this.handleIntroductionRequest(userName))
-    socket.on('close', this.closeIntroductionConnection(userName))
+    socket.on("message", this.handleIntroductionRequest(userName))
+    socket.on("close", this.closeIntroductionConnection(userName))
 
-    this.emit('introductionConnection', userName)
+    this.emit("introductionConnection", userName)
   }
 
-  private handleIntroductionRequest = (userName: UserName) => (data: any) => {
-    const A = userName // A and B always refer to peer userNames
-    const currentDocumentIds = this.documentIds[A] ?? []
+  private handleIntroductionRequest =
+    (userName: UserName) => (data: Uint8Array) => {
+      const A = userName // A and B always refer to peer userNames
+      const currentDocumentIds = this.documentIds[A] ?? []
 
-    const message = tryParse<Message.ClientToServer>(data.toString())
-    if (message instanceof Error) {
-      this.emit('error', { error: message, data })
-      return
-    }
+      const message = tryParse<Message.ClientToServer>(data)
+      if (message instanceof Error) {
+        // console.log("ERROR", message)
+        this.emit("error", { error: message, data })
+        return
+      }
 
-    switch (message.type) {
-      case 'Heartbeat':
-        // nothing to do
-        this.log('♥', userName)
-        break
+      switch (message.type) {
+        case "Heartbeat":
+          // nothing to do
+          this.log("♥", userName)
+          break
 
-      case 'Join':
-        this.log('introduction request: %o', message)
-        // An introduction request from the client will include a list of documentIds to join.
-        // We combine those documentIds with any we already have and deduplicate.
-        this.documentIds[A] = currentDocumentIds.concat(message.documentIds).reduce(deduplicate, [])
+        case "Join":
+          this.log("introduction request: %o", message)
+          // An introduction request from the client will include a list of documentIds to join.
+          // We combine those documentIds with any we already have and deduplicate.
+          this.documentIds[A] = currentDocumentIds
+            .concat(message.documentIds)
+            .reduce(deduplicate, [])
 
-        // if this peer (A) has interests in common with any existing peer (B), introduce them to each other
-        for (const B in this.peers) {
-          // don't introduce peer to themselves
-          if (A === B) continue
+          // if this peer (A) has interests in common with any existing peer (B), introduce them to each other
+          for (const B in this.peers) {
+            // don't introduce peer to themselves
+            if (A === B) continue
 
-          // find documentIds that both peers are interested in
-          const commonKeys = intersection(this.documentIds[A], this.documentIds[B])
-          if (commonKeys.length) {
-            this.log('sending introductions', A, B, commonKeys)
-            this.sendIntroduction(A, B, commonKeys)
-            this.sendIntroduction(B, A, commonKeys)
+            // find documentIds that both peers are interested in
+            const commonKeys = intersection(
+              this.documentIds[A],
+              this.documentIds[B]
+            )
+            if (commonKeys.length) {
+              this.log("sending introductions", A, B, commonKeys)
+              this.sendIntroduction(A, B, commonKeys)
+              this.sendIntroduction(B, A, commonKeys)
+            }
           }
-        }
-        break
-      case 'Leave':
-        // remove the provided documentIds from this peer's list
-        this.documentIds[A] = currentDocumentIds.filter(id => !message.documentIds.includes(id))
-        break
+          break
+        case "Leave":
+          // remove the provided documentIds from this peer's list
+          this.documentIds[A] = currentDocumentIds.filter(
+            id => !message.documentIds.includes(id)
+          )
+          break
 
-      default:
-        break
+        default:
+          break
+      }
     }
-  }
 
   private send(peer: WebSocket, message: Message.ServerToClient) {
     if (peer && peer.readyState === WebSocket.OPEN) {
       try {
-        peer.send(JSON.stringify(message))
+        peer.send(pack(message))
       } catch (err) {
-        console.error('Failed to send message to peer')
+        console.error("Failed to send message to peer")
       }
     }
   }
 
   // If we find another peer interested in the same documentId(s), we send both peers an introduction,
   // which they can use to connect
-  private sendIntroduction = (A: UserName, B: UserName, documentIds: DocumentId[]) => {
+  private sendIntroduction = (
+    A: UserName,
+    B: UserName,
+    documentIds: DocumentId[]
+  ) => {
     const message: Message.Introduction = {
-      type: 'Introduction',
+      type: "Introduction",
       userName: B, // the userName of the other peer
       documentIds, // the documentId(s) both are interested in
     }
@@ -207,14 +212,17 @@ export class Server extends EventEmitter {
     const AseeksB = `${A}:${B}:${documentId}`
     const BseeksA = `${B}:${A}:${documentId}`
 
-    const holdMessage = (message: any) => this.holding[AseeksB]?.messages.push(message)
+    const holdMessage = (message: any) =>
+      this.holding[AseeksB]?.messages.push(message)
 
     if (this.holding[BseeksA]) {
       // We already have a connection request from Bob; hook them up
 
       const { socket: socketB, messages } = this.holding[BseeksA]
 
-      this.log(`found peer, connecting ${AseeksB} (${messages.length} stored messages)`)
+      this.log(
+        `found peer, connecting ${AseeksB} (${messages.length} stored messages)`
+      )
       // Send any stored messages
       messages.forEach(message => this.send(socket, message))
 
@@ -222,30 +230,40 @@ export class Server extends EventEmitter {
       pipeSockets(socketA, socketB)
 
       // Don't need to hold the connection or messages any more
-      socketA.removeListener('message', holdMessage)
+      socketA.removeListener("message", holdMessage)
       delete this.holding[BseeksA]
     } else {
       // We haven't heard from Bob yet; hold this connection
-      this.log('holding connection for peer', AseeksB)
+      this.log("holding connection for peer", AseeksB)
 
       // hold Alice's socket ready, and hold any messages Alice sends to Bob in the meantime
       this.holding[AseeksB] = { socket: socketA, messages: [] }
 
       socketA
         // hold on to incoming messages from Alice for Bob
-        .on('message', holdMessage)
-        .on('close', () => delete this.holding[AseeksB])
+        .on("message", holdMessage)
+        .on("close", () => delete this.holding[AseeksB])
     }
   }
 }
 
-const tryParse = <T>(s: string): T | Error => {
+const tryParse = <T>(s: Uint8Array): T | Error => {
   try {
-    return JSON.parse(s)
-  } catch (err) {
-    if (err instanceof SyntaxError) {
-      return new SyntaxError('Message is not valid JSON')
-    }
-    return err
+    return unpack(s)
+  } catch (error: any) {
+    return new Error(error.toString())
   }
+}
+
+const { version } = pkg
+
+const { app } = expressWs(express())
+
+const logoPage = `
+  <body style="background:black; display:flex; justify-content:center; align-items:center">
+    <img src="https://raw.githubusercontent.com/local-first-web/branding/main/svg/relay-v.svg" width="50%" alt="@localfirst/relay logo"/>
+  </body>`
+
+interface ListenOptions {
+  silent?: boolean
 }

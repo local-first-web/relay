@@ -1,4 +1,4 @@
-import { Server } from './Server'
+import { Server } from "./Server.js"
 
 const DEFAULT_PORT = 8080
 const port = Number(process.env.PORT) || DEFAULT_PORT

@@ -1,4 +1,5 @@
-﻿import { pause } from './pause'
+﻿import { pause } from "./pause.js"
+import WebSocket from "isomorphic-ws"
 
 export const isReady = async (socket: WebSocket) =>
   new Promise<void>(async (resolve, reject) => {

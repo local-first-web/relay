@@ -1,5 +1,5 @@
-﻿import { EventEmitter as _EventEmitter } from 'eventemitter3'
-import debug from 'debug'
+﻿import { EventEmitter as _EventEmitter } from "eventemitter3"
+import debug from "debug"
 
 /** EventEmitter with built-in logging */
 export class EventEmitter extends _EventEmitter {
@@ -11,7 +11,7 @@ export class EventEmitter extends _EventEmitter {
   log: debug.Debugger = debug(`EventEmitter`)
 
   public emit(event: string | symbol, ...args: any[]) {
-    this.log(`${event.toString()}`, ...args)
+    this.log(`${event.toString()} %o`, ...args)
     return super.emit(event, ...args)
   }
 }

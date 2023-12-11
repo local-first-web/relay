@@ -1,12 +1,20 @@
-import debug, { Debugger } from 'debug'
-import { EventEmitter } from './EventEmitter'
-import { isReady } from './isReady'
-import { newid } from './newid'
-import { ClientOptions, DocumentId, Message, PeerSocketMap, UserName } from './types'
-import pkg from '../package.json'
+import debug, { Debugger } from "debug"
+import WebSocket, { ErrorEvent } from "isomorphic-ws"
+import { pack, unpack } from "./msgpack.js"
+import pkg from "../package.json"
+import { EventEmitter } from "./EventEmitter.js"
+import { isReady } from "./isReady.js"
+import { newid } from "./newid.js"
+import type {
+  ClientOptions,
+  DocumentId,
+  Message,
+  PeerSocketMap,
+  UserName,
+} from "./types.js"
 
 const { version } = pkg
-const HEARTBEAT = JSON.stringify({ type: 'Heartbeat' })
+const HEARTBEAT = pack({ type: "Heartbeat" })
 const HEARTBEAT_INTERVAL = 55000 // 55 seconds
 
 export interface PeerEventPayload {
@@ -87,7 +95,7 @@ export class Client extends EventEmitter {
   }: ClientOptions) {
     super()
     this.log = debug(`lf:relay:client:${userName}`)
-    this.log('version', version)
+    this.log("version", version)
 
     this.userName = userName
     this.url = url
@@ -109,7 +117,7 @@ export class Client extends EventEmitter {
    */
   public connectToServer() {
     const url = `${this.url}/introduction/${this.userName}`
-    this.log('connecting to relay server', url)
+    this.log("connecting to relay server", url)
 
     const serverConnection = new WebSocket(url)
 
@@ -118,19 +126,23 @@ export class Client extends EventEmitter {
       this.retryDelay = this.minRetryDelay
       this.shouldReconnectIfClosed = true
       this.drainQueue()
-      this.emit('server.connect')
+      this.emit("server.connect")
       this.open = true
 
-      this.heartbeat = setInterval(() => serverConnection.send(HEARTBEAT), HEARTBEAT_INTERVAL)
+      this.heartbeat = setInterval(
+        () => serverConnection.send(HEARTBEAT),
+        HEARTBEAT_INTERVAL
+      )
     }
 
     serverConnection.onmessage = messageEvent => {
-      const { data } = messageEvent
-      const message = JSON.parse(data.toString()) as Message.ServerToClient
+      const data = messageEvent.data as Uint8Array
+      const message = unpack(data) as Message.ServerToClient
 
       // The only kind of message that we receive from the relay server is an introduction, which tells
       // us that someone else is interested in the same thing we are.
-      if (message.type !== 'Introduction') throw new Error(`Invalid message type '${message.type}'`)
+      if (message.type !== "Introduction")
+        throw new Error(`Invalid message type '${message.type}'`)
 
       // When we receive that message, we respond by requesting a "direct" connection to the peer
       // (via piped sockets on the relay server) for each document ID that we have in common
@@ -149,7 +161,7 @@ export class Client extends EventEmitter {
 
           // add the socket to the map for this peer
           peer.set(documentId, peerConnection)
-          this.emit('peer.connect', {
+          this.emit("peer.connect", {
             userName,
             documentId,
             socket: peerConnection,
@@ -159,7 +171,7 @@ export class Client extends EventEmitter {
         // if the other end disconnects, we disconnect
         peerConnection.onclose = () => {
           this.closeSocket(userName, documentId)
-          this.emit('peer.disconnect', {
+          this.emit("peer.disconnect", {
             userName,
             documentId,
             socket: peerConnection,
@@ -173,7 +185,7 @@ export class Client extends EventEmitter {
 
     serverConnection.onclose = () => {
       this.open = false
-      this.emit('server.disconnect')
+      this.emit("server.disconnect")
 
       // stop heartbeat
       clearInterval(this.heartbeat)
@@ -181,8 +193,8 @@ export class Client extends EventEmitter {
       if (this.shouldReconnectIfClosed) this.tryToReopen()
     }
 
-    serverConnection.onerror = (ev: Event) => {
-      this.emit('error', ev)
+    serverConnection.onerror = (ev: ErrorEvent) => {
+      this.emit("error", ev)
     }
 
     this.serverConnection = serverConnection
@@ -200,7 +212,11 @@ export class Client extends EventEmitter {
     if (this.retryDelay < this.maxRetryDelay)
       this.retryDelay *= this.backoffFactor + Math.random() * 0.1 - 0.05 // randomly vary the delay
 
-    this.log(`Relay connection closed. Retrying in ${Math.floor(this.retryDelay / 1000)}s`)
+    this.log(
+      `Relay connection closed. Retrying in ${Math.floor(
+        this.retryDelay / 1000
+      )}s`
+    )
   }
 
   /**
@@ -210,9 +226,9 @@ export class Client extends EventEmitter {
    * @param documentId
    */
   public join(documentId: DocumentId) {
-    this.log('joining', documentId)
+    this.log("joining", documentId)
     this.documentIds.add(documentId)
-    const message: Message.Join = { type: 'Join', documentIds: [documentId] }
+    const message: Message.Join = { type: "Join", documentIds: [documentId] }
     this.send(message)
     return this
   }
@@ -222,12 +238,12 @@ export class Client extends EventEmitter {
    * @param documentId
    */
   public leave(documentId: DocumentId) {
-    this.log('leaving', documentId)
+    this.log("leaving", documentId)
     this.documentIds.delete(documentId)
     for (const [userName] of this.peers) {
       this.closeSocket(userName, documentId)
     }
-    const message: Message.Leave = { type: 'Leave', documentIds: [documentId] }
+    const message: Message.Leave = { type: "Leave", documentIds: [documentId] }
     this.send(message)
     return this
   }
@@ -264,7 +280,9 @@ export class Client extends EventEmitter {
 
   public has(peerUserName: UserName, documentId?: DocumentId): boolean {
     if (documentId !== undefined) {
-      return this.has(peerUserName) && this.peers.get(peerUserName).has(documentId)
+      return (
+        this.has(peerUserName) && this.peers.get(peerUserName)!.has(documentId)
+      )
     } else {
       return this.peers.has(peerUserName)
     }
@@ -284,7 +302,7 @@ export class Client extends EventEmitter {
 
   private drainQueue() {
     while (this.serverConnectionQueue.length) {
-      let message = this.serverConnectionQueue.shift()
+      let message = this.serverConnectionQueue.shift()!
       this.send(message)
     }
   }
@@ -292,7 +310,8 @@ export class Client extends EventEmitter {
   private async send(message: Message.ClientToServer) {
     await isReady(this.serverConnection)
     try {
-      this.serverConnection.send(JSON.stringify(message))
+      const msgBytes = pack(message)
+      this.serverConnection.send(msgBytes)
     } catch (err) {
       this.serverConnectionQueue.push(message)
     }
@@ -302,8 +321,14 @@ export class Client extends EventEmitter {
     const peer = this.get(userName)
     if (peer.has(documentId)) {
       const socket = peer.get(documentId)
-      if (socket && socket.readyState !== socket.CLOSED && socket.readyState !== socket.CLOSING)
+      if (
+        socket &&
+        socket.readyState !== socket.CLOSED &&
+        socket.readyState !== socket.CLOSING
+      ) {
+        // socket.removeAllListeners()
         socket.close()
+      }
       peer.delete(documentId)
     }
   }

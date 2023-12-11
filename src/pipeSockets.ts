@@ -1,4 +1,4 @@
-﻿import WebSocket from 'ws'
+﻿import WebSocket from "isomorphic-ws"
 
 export const pipeSockets = (socket1: WebSocket, socket2: WebSocket) => {
   const pipeOneWay = (A: WebSocket, B: WebSocket) => {
@@ -6,13 +6,13 @@ export const pipeSockets = (socket1: WebSocket, socket2: WebSocket) => {
       A.close()
       B.close()
     }
-    A.on('message', data => {
+    A.on("message", data => {
       const ready = B.readyState === WebSocket.OPEN
       if (ready) B.send(data)
       else A.close()
     })
-    A.on('error', cleanup)
-    A.on('close', cleanup)
+    A.on("error", cleanup)
+    A.on("close", cleanup)
   }
   pipeOneWay(socket1, socket2)
   pipeOneWay(socket2, socket1)
