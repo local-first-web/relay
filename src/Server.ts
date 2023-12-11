@@ -4,7 +4,7 @@ import expressWs from "express-ws"
 import WebSocket from "isomorphic-ws"
 import { pack, unpack } from "msgpackr"
 import { Server as HttpServer, Socket } from "net"
-import pkg from "../package.json"
+import pkg from "../package.json" assert { type: "json" }
 import { EventEmitter } from "./lib/EventEmitter.js"
 import { deduplicate } from "./lib/deduplicate.js"
 import { intersection } from "./lib/intersection.js"

@@ -52,15 +52,16 @@ requests from Alice and Bob, we pipe their sockets together.
 From this monorepo, you can run this server as follows:
 
 ```bash
-$ yarn start
+$ pnpm start
 ```
 
 You should see something like thsi:
 
 ```bash
 yarn run v1.22.4
-$ yarn workspace @localfirst/relay start
-$ node dist/start.js
+> @localfirst/relay@4.0.0 start local-first-web/relay
+> node dist/start.js
+
 🐟 Listening at http://localhost:8080
 ```
 
@@ -83,7 +84,7 @@ See instructions for deploying to:
 
 ### Usage
 
-[@localfirst/relay-client], included in this repo, is a lightweight client library designed to be
+This library includes a lightweight client library designed to be
 used with this server.
 
 > You don't strictly need to use this client - you could interact directly with the server the way we
@@ -94,16 +95,18 @@ The client keeps track of all peers that the server connects you to, and for eac
 track of each documentId (aka discoveryKey, aka channel) that you're working with that peer on.
 
 ```ts
-client = new Client({ userName: 'alice', url: 'myrelay.somedomain.com' })
-  .join('ambitious-mongoose')
-  .on('peer.connect', ({ documentId, userName, socket }) => {
+import { Client } from "@localfirst/relay"
+
+client = new Client({ userName: "alice", url: "myrelay.somedomain.com" })
+  .join("ambitious-mongoose")
+  .on("peer.connect", ({ documentId, userName, socket }) => {
     // `socket` is a WebSocket
 
     // send a message
-    socket.write('Hello! 🎉')
+    socket.write("Hello! 🎉")
 
     // listen for messages
-    socket.on('data', message => {
+    socket.on("data", message => {
       console.log(`message from ${userName} about ${documentId}`, message)
     })
   })
@@ -122,7 +125,7 @@ network) as untrusted.
 
 ## Server API
 
-> The following documentation might be of interest to anyone working on `@localfirst/relay-client`, or replacing it
+> The following documentation might be of interest to anyone working on the @localfirst/relay `Client`, or replacing it
 > with a new client. You don't need to know any of this to interact with this server if you're using the included client.
 
 This server has two WebSocket endpoints: `introduction` and `connection`.

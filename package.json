@@ -13,7 +13,7 @@
     "prebuild": "rimraf dist",
     "build": "tsc -p tsconfig.build.json",
     "dev": "cross-env DEBUG='lf*' DEBUG_COLORS=1 ts-node-dev src/start.ts --respawn --transpileOnly",
-    "start": "node dist/start.js",
+    "start": "cross-env NODE_NO_WARNINGS=1 node dist/start.js",
     "start:log": "cross-env DEBUG='lf*' DEBUG_COLORS=1 pnpm start",
     "test": "vitest",
     "test:log": "cross-env DEBUG='lf*' DEBUG_COLORS=1 pnpm test"
