@@ -1,9 +1,9 @@
 import debug from "debug"
 import express from "express"
-import expressWs from "express-ws"
-import WebSocket from "isomorphic-ws"
+import expressWs, { Application } from "express-ws"
+import { WebSocket, WebSocketServer } from "isomorphic-ws"
 import { pack, unpack } from "msgpackr"
-import { Server as HttpServer, Socket } from "net"
+import { Socket as HttpSocket } from "net"
 import pkg from "../package.json" assert { type: "json" }
 import { EventEmitter } from "./lib/EventEmitter.js"
 import { deduplicate } from "./lib/deduplicate.js"
@@ -20,8 +20,9 @@ type ServerEvents = {
   ready: () => void
   close: () => void
   error: (payload: { error: Error; data: Uint8Array }) => void
-  introductionConnection: (userName: UserName) => void
+  introduction: (userName: UserName) => void
 }
+
 /**
  * This server provides two services:
  *
@@ -56,63 +57,65 @@ export class Server extends EventEmitter<ServerEvents> {
   /**
    * Keep these references for cleanup
    */
-  private httpServer?: HttpServer
-  private httpSockets: Socket[] = []
+  private socket: WebSocketServer
+  private app: Application
+  private sockets = new Set<WebSocket>()
 
   public log: debug.Debugger
 
   constructor({ port = 8080 } = {}) {
     super()
+    this.port = port
+    this.app = expressWs(express()).app
+    this.socket = new WebSocketServer({ noServer: true })
+
     this.log = debug(`lf:relay:${port}`)
     this.log("version", version)
-    this.port = port
   }
 
   // SERVER
 
   listen({ silent = false }: ListenOptions = {}) {
     return new Promise<void>((resolve, reject) => {
-      // Allow hitting this server from a browser as a sanity check
-      app.get("/", (_, res) => res.send(logoPage).end())
+      this.app
+        // Allow hitting this server from a browser as a sanity check
+        .get("/", (_, res) => res.send(logoPage).end())
 
-      // Introduction request
-      app.ws("/introduction/:userName", (ws, { params: { userName } }) => {
-        this.log("received introduction request", userName)
-        this.openIntroductionConnection(ws, userName)
-      })
+        // Introduction request
+        .ws("/introduction/:userName", (ws, { params: { userName } }) => {
+          this.log("received introduction request", userName)
+          this.openIntroductionConnection(ws, userName)
+          this.sockets.add(ws)
+        })
 
-      // Connection request
-      app.ws(
-        "/connection/:A/:B/:documentId",
-        (ws, { params: { A, B, documentId } }) => {
-          this.log("received connection request", A, B)
-          this.openConnection({ socket: ws, A, B, documentId })
-        }
-      )
+        // Connection request
+        .ws(
+          "/connection/:A/:B/:documentId",
+          (ws, { params: { A, B, documentId } }) => {
+            this.log("received connection request", A, B)
+            this.openConnection({ socket: ws, A, B, documentId })
+            this.sockets.add(ws)
+          }
+        )
 
-      this.httpServer = app
         .listen(this.port, () => {
           if (!silent)
             console.log(`🐟 ⯁ Listening at http://localhost:${this.port}`)
           this.emit("ready")
           resolve()
         })
-        .on("connection", socket => {
-          // keep track of sockets for cleanup
-          this.httpSockets.push(socket)
-        })
+
+        .on("error", reject)
     })
   }
 
   close() {
-    this.log("attempting httpServer.close")
-    this.httpSockets.forEach(socket => {
-      socket.end()
-      socket.destroy()
+    this.sockets.forEach(socket => {
+      socket.removeAllListeners()
+      socket.close()
+      socket.terminate()
     })
-    return this.httpServer?.close(() => {
-      this.emit("close")
-    })
+    return this.app.removeAllListeners()
   }
 
   // DISCOVERY
@@ -123,7 +126,7 @@ export class Server extends EventEmitter<ServerEvents> {
     socket.on("message", this.handleIntroductionRequest(userName))
     socket.on("close", this.closeIntroductionConnection(userName))
 
-    this.emit("introductionConnection", userName)
+    this.emit("introduction", userName)
   }
 
   private handleIntroductionRequest =
@@ -268,7 +271,7 @@ const tryParse = <T>(s: Uint8Array): T | Error => {
 
 const { version } = pkg
 
-const { app } = expressWs(express())
+// const { app } = expressWs(express())
 
 const logoPage = `
   <body style="background:black; display:flex; justify-content:center; align-items:center">
