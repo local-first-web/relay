@@ -136,8 +136,8 @@ export class Server extends EventEmitter<ServerEvents> {
       }
 
       switch (message.type) {
-        case "Heartbeat":
-          // nothing to do
+        case "❤️":
+          // heartbeat - nothing to do
           this.log("♥", userName)
           break
 

@@ -15,7 +15,7 @@ export namespace Message {
   export type ClientToServer = Join | Leave | Heartbeat
 
   export interface Heartbeat {
-    type: "Heartbeat"
+    type: "❤️"
   }
 
   export interface Join {
