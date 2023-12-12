@@ -1,5 +1,9 @@
 import WebSocket from "isomorphic-ws"
 
+export type UserName = string
+
+export type DocumentId = string
+
 export type ConnectRequestParams = {
   socket: WebSocket
   A: UserName
@@ -33,10 +37,13 @@ export namespace Message {
   }
 }
 
-export type UserName = string
-
-export type DocumentId = string
-
+export type ClientEvents = {
+  "server.connect": () => void
+  "server.disconnect": () => void
+  error: (err: Error) => void
+  "peer.connect": (payload: PeerEventPayload) => void
+  "peer.disconnect": (payload: PeerEventPayload) => void
+}
 export interface PeerEventPayload {
   documentId: DocumentId
   userName: UserName
