@@ -36,7 +36,7 @@ for a topic or channel &mdash; it could be a GUID, or just a string like `ambiti
 [![diagram](./images/relay-introduction.png)](https://raw.githubusercontent.com/local-first-web/relay/master/images/relay-introduction.png)
 
 If Bob is interested in the same documentId or documentIds, each will receive an `Introduction` message with the
-other's userName. They can then use that information to connect.
+other's peerId. They can then use that information to connect.
 
 ### 2. Connection
 
@@ -97,9 +97,9 @@ track of each documentId (aka discoveryKey, aka channel) that you're working wit
 ```ts
 import { Client } from "@localfirst/relay"
 
-client = new Client({ userName: "alice", url: "myrelay.somedomain.com" })
+client = new Client({ peerId: "alice", url: "myrelay.somedomain.com" })
   .join("ambitious-mongoose")
-  .on("peer.connect", ({ documentId, userName, socket }) => {
+  .on("peer.connect", ({ documentId, peerId, socket }) => {
     // `socket` is a WebSocket
 
     // send a message
@@ -107,7 +107,7 @@ client = new Client({ userName: "alice", url: "myrelay.somedomain.com" })
 
     // listen for messages
     socket.on("data", message => {
-      console.log(`message from ${userName} about ${documentId}`, message)
+      console.log(`message from ${peerId} about ${documentId}`, message)
     })
   })
 ```
@@ -152,7 +152,7 @@ This server has two WebSocket endpoints: `introduction` and `connection`.
   ```ts
   {
     type: 'Introduction',
-    userName: 'bob', // the peer's userName
+    peerId: 'bob', // the peer's peerId
     documentIds: ['ambitious-mongoose'] // documents we're both interested in
   }
   ```
@@ -239,9 +239,9 @@ az group create --name my-local-first-relay --location eastus
 az configure --defaults group=my-local-first-relay location=eastus
 az appservice plan create --name my-local-first-relay --sku F1
 az webapp create --name my-local-first-relay --plan my-local-first-relay
-az webapp deployment user set --user-name USERNAME --password PASSWORD
+az webapp deployment user set --user-name PEERID --password PASSWORD
 az webapp deployment source config-local-git --name my-local-first-relay
-git remote add azure https://USERNAME@my-local-first-relay.scm.azurewebsites.net/my-local-first-relay.git
+git remote add azure https://PEERID@my-local-first-relay.scm.azurewebsites.net/my-local-first-relay.git
 git push azure main
 az webapp browse --name my-local-first-relay
 ```

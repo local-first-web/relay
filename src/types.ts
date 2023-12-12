@@ -1,13 +1,13 @@
 import WebSocket from "isomorphic-ws"
 
-export type UserName = string
+export type PeerId = string
 
 export type DocumentId = string
 
 export type ConnectRequestParams = {
   socket: WebSocket
-  A: UserName
-  B: UserName
+  A: PeerId
+  B: PeerId
   documentId: DocumentId
 }
 
@@ -32,7 +32,7 @@ export namespace Message {
 
   export interface Introduction {
     type: "Introduction"
-    userName: UserName // the other peer we're introducing this client to
+    peerId: PeerId // the other peer we're introducing this client to
     documentIds: DocumentId[]
   }
 }
@@ -46,13 +46,13 @@ export type ClientEvents = {
 }
 export interface PeerEventPayload {
   documentId: DocumentId
-  userName: UserName
+  peerId: PeerId
   socket: WebSocket
 }
 
 export interface ClientOptions {
   /** My user name. If one is not provided, a random one will be created for this session. */
-  userName?: UserName
+  peerId?: PeerId
 
   /** The base URL of the relay server to connect to. */
   url: string
@@ -69,7 +69,7 @@ export type ServerEvents = {
   ready: () => void
   close: () => void
   error: (payload: { error: Error; data: Uint8Array }) => void
-  introduction: (userName: UserName) => void
+  introduction: (peerId: PeerId) => void
 }
 
 export type PeerSocketMap = Map<DocumentId, WebSocket | null>

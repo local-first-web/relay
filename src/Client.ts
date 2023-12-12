@@ -11,7 +11,7 @@ import type {
   DocumentId,
   Message,
   PeerSocketMap,
-  UserName,
+  PeerId,
 } from "./types.js"
 
 const { version } = pkg
@@ -19,7 +19,7 @@ const HEARTBEAT = pack({ type: "Heartbeat" })
 const HEARTBEAT_INTERVAL = 55000 // 55 seconds
 
 export interface PeerEventPayload {
-  userName: UserName
+  peerId: PeerId
   documentId: DocumentId
   socket: WebSocket
 }
@@ -34,9 +34,9 @@ export interface PeerEventPayload {
  * The simplest workflow is something like this:
  *
  * ```ts
- * client = new Client({ userName: 'my-peer-userName', url })
- *   .join('my-document-userName')
- *   .on('peer-connect', ({documentId, userName, socket}) => {
+ * client = new Client({ peerId: 'my-peer-peerId', url })
+ *   .join('my-document-peerId')
+ *   .on('peer-connect', ({documentId, peerId, socket}) => {
  *     // send a message
  *     socket.send('Hello!')
  *
@@ -48,7 +48,7 @@ export interface PeerEventPayload {
  * ```
  */
 export class Client extends EventEmitter<ClientEvents> {
-  public userName: UserName
+  public peerId: PeerId
 
   /** The base URL of the relay server */
   public url: string
@@ -58,7 +58,7 @@ export class Client extends EventEmitter<ClientEvents> {
 
   /** All the peers we're connected to. (A 'peer' in this case is actually just a bunch of sockets -
    * one per documentId that we have in common.) */
-  public peers: Map<UserName, PeerSocketMap> = new Map()
+  public peers: Map<PeerId, PeerSocketMap> = new Map()
 
   /** When disconnected, the delay in milliseconds before the next retry */
   public retryDelay: number
@@ -81,12 +81,12 @@ export class Client extends EventEmitter<ClientEvents> {
   private pendingMessages: Message.ClientToServer[] = []
 
   /**
-   * @param userName a string that identifies you uniquely, defaults to a CUID
+   * @param peerId a string that identifies you uniquely, defaults to a CUID
    * @param url the url of the `relay`, e.g. `http://myrelay.mydomain.com`
    * @param documentIds one or more document IDs that you're interested in
    */
   constructor({
-    userName = newid(),
+    peerId = newid(),
     url,
     documentIds = [],
     minRetryDelay = 10,
@@ -94,10 +94,10 @@ export class Client extends EventEmitter<ClientEvents> {
     maxRetryDelay = 30000,
   }: ClientOptions) {
     super()
-    this.log = debug(`lf:relay:client:${userName}`)
+    this.log = debug(`lf:relay:client:${peerId}`)
     this.log("version", version)
 
-    this.userName = userName
+    this.peerId = peerId
     this.url = url
     this.minRetryDelay = minRetryDelay
     this.maxRetryDelay = maxRetryDelay
@@ -118,7 +118,7 @@ export class Client extends EventEmitter<ClientEvents> {
    * @returns the socket connecting us to the server
    */
   public connectToServer() {
-    const url = `${this.url}/introduction/${this.userName}`
+    const url = `${this.url}/introduction/${this.peerId}`
     this.log("connecting to relay server", url)
 
     this.serverConnection = new WebSocket(url)
@@ -157,8 +157,8 @@ export class Client extends EventEmitter<ClientEvents> {
   public leave(documentId: DocumentId) {
     this.log("leaving", documentId)
     this.documentIds.delete(documentId)
-    for (const [userName] of this.peers) {
-      this.closeSocket(userName, documentId)
+    for (const [peerId] of this.peers) {
+      this.closeSocket(peerId, documentId)
     }
     const message: Message.Leave = { type: "Leave", documentIds: [documentId] }
     this.send(message)
@@ -167,13 +167,13 @@ export class Client extends EventEmitter<ClientEvents> {
 
   /**
    * Disconnects from one peer
-   * @param peerUserName Name of the peer to disconnect. If none is provided, we disconnect all peers.
+   * @param peerPeerId Name of the peer to disconnect. If none is provided, we disconnect all peers.
    */
-  public disconnectPeer(peerUserName: UserName) {
-    this.log(`disconnecting from ${peerUserName}`)
-    const peer = this.get(peerUserName)
+  public disconnectPeer(peerPeerId: PeerId) {
+    this.log(`disconnecting from ${peerPeerId}`)
+    const peer = this.get(peerPeerId)
     for (const [documentId] of peer) {
-      this.closeSocket(peerUserName, documentId)
+      this.closeSocket(peerPeerId, documentId)
     }
     return this
   }
@@ -188,32 +188,30 @@ export class Client extends EventEmitter<ClientEvents> {
     this.shouldReconnectIfClosed = false
 
     const peersToDisconnect = Array.from(this.peers.keys()) // all of them
-    for (const userName of peersToDisconnect) {
-      this.disconnectPeer(userName)
+    for (const peerId of peersToDisconnect) {
+      this.disconnectPeer(peerId)
     }
     this.removeAllListeners()
     this.serverConnection.close()
   }
 
-  public has(peerUserName: UserName, documentId?: DocumentId): boolean {
+  public has(peerPeerId: PeerId, documentId?: DocumentId): boolean {
     if (documentId !== undefined) {
-      return (
-        this.has(peerUserName) && this.peers.get(peerUserName)!.has(documentId)
-      )
+      return this.has(peerPeerId) && this.peers.get(peerPeerId)!.has(documentId)
     } else {
-      return this.peers.has(peerUserName)
+      return this.peers.has(peerPeerId)
     }
   }
 
-  public get(peerUserName: UserName): PeerSocketMap
-  public get(peerUserName: UserName, documentId: DocumentId): WebSocket | null
-  public get(peerUserName: UserName, documentId?: DocumentId) {
+  public get(peerPeerId: PeerId): PeerSocketMap
+  public get(peerPeerId: PeerId, documentId: DocumentId): WebSocket | null
+  public get(peerPeerId: PeerId, documentId?: DocumentId) {
     if (documentId !== undefined) {
-      return this.get(peerUserName)?.get(documentId)
+      return this.get(peerPeerId)?.get(documentId)
     } else {
       // create an entry for this peer if there isn't already one
-      if (!this.has(peerUserName)) this.peers.set(peerUserName, new Map())
-      return this.peers.get(peerUserName)
+      if (!this.has(peerPeerId)) this.peers.set(peerPeerId, new Map())
+      return this.peers.get(peerPeerId)
     }
   }
 
@@ -246,9 +244,9 @@ export class Client extends EventEmitter<ClientEvents> {
     if (message.type !== "Introduction")
       throw new Error(`Invalid message type '${message.type}'`)
 
-    const { userName, documentIds = [] } = message
+    const { peerId, documentIds = [] } = message
     documentIds.forEach(documentId => {
-      this.connectToPeer(documentId, userName)
+      this.connectToPeer(documentId, peerId)
     })
   }
 
@@ -256,12 +254,12 @@ export class Client extends EventEmitter<ClientEvents> {
    * When we receive an introduction message, we respond by requesting a "direct" connection to the
    * peer (via piped sockets on the relay server) for each document ID that we have in common
    */
-  private connectToPeer(documentId: DocumentId, userName: UserName) {
-    const peer = this.get(userName)
+  private connectToPeer(documentId: DocumentId, peerId: PeerId) {
+    const peer = this.get(peerId)
     if (peer.has(documentId)) return // don't add twice
     peer.set(documentId, null)
 
-    const url = `${this.url}/connection/${this.userName}/${userName}/${documentId}`
+    const url = `${this.url}/connection/${this.peerId}/${peerId}/${documentId}`
     const socket = new WebSocket(url)
 
     socket
@@ -270,13 +268,13 @@ export class Client extends EventEmitter<ClientEvents> {
         await isReady(socket)
         // add the socket to the map for this peer
         peer.set(documentId, socket)
-        this.emit("peer-connect", { userName, documentId, socket })
+        this.emit("peer-connect", { peerId, documentId, socket })
       })
 
       // if the other end disconnects, we disconnect
       .on("close", () => {
-        this.closeSocket(userName, documentId)
-        this.emit("peer-disconnect", { userName, documentId, socket })
+        this.closeSocket(peerId, documentId)
+        this.emit("peer-disconnect", { peerId, documentId, socket })
       })
   }
 
@@ -328,8 +326,8 @@ export class Client extends EventEmitter<ClientEvents> {
     }
   }
 
-  private closeSocket(userName: UserName, documentId: DocumentId) {
-    const peer = this.get(userName)
+  private closeSocket(peerId: PeerId, documentId: DocumentId) {
+    const peer = this.get(peerId)
     if (peer.has(documentId)) {
       const socket = peer.get(documentId)
       if (

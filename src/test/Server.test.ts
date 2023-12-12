@@ -10,9 +10,9 @@ import { permutationsOfTwo } from "./helpers/permutationsOfTwo.js"
 
 /**
  * In this context:
- * - `userName` is always a peer userName.
+ * - `peerId` is always a peer peerId.
  * - `peer` is always a reference to a client's socket connection.
- * - `documentId` is always a document userName (elsewhere referred to as a 'channel' or a 'discovery documentId'.
+ * - `documentId` is always a document peerId (elsewhere referred to as a 'channel' or a 'discovery documentId'.
  */
 let testId = 0
 
@@ -42,10 +42,10 @@ const setup = async () => {
 
 const requestIntroduction = async (
   url: string,
-  userName: string,
+  peerId: string,
   documentId: string
 ) => {
-  const peer = new WebSocket(`${url}/introduction/${userName}`)
+  const peer = new WebSocket(`${url}/introduction/${peerId}`)
   const joinMessage: Message.Join = {
     type: "Join",
     documentIds: [documentId],
@@ -60,8 +60,8 @@ it("should make an introduction connection", async () => {
   const { aliceId, url, server, teardown } = await setup()
 
   const alice = new WebSocket(`${url}/introduction/${aliceId}`)
-  const userName = await eventPromise(server, "introduction")
-  expect(userName).toEqual(aliceId)
+  const peerId = await eventPromise(server, "introduction")
+  expect(peerId).toEqual(aliceId)
   expect(server.peers).toHaveProperty(aliceId)
   expect(server.documentIds).toEqual({})
 
@@ -110,7 +110,7 @@ it("should invite peers to connect", async () => {
       const invitation = unpack(d)
       expect(invitation).toEqual({
         type: "Introduction",
-        userName: bobId,
+        peerId: bobId,
         documentIds: [documentId],
       })
       resolve()
@@ -121,7 +121,7 @@ it("should invite peers to connect", async () => {
       const invitation = unpack(d)
       expect(invitation).toEqual({
         type: "Introduction",
-        userName: aliceId,
+        peerId: aliceId,
         documentIds: [documentId],
       })
       resolve()
@@ -144,7 +144,7 @@ it("should pipe connections between two peers", async () => {
 
   expect(invitation).toEqual({
     type: "Introduction",
-    userName: bobId,
+    peerId: bobId,
     documentIds: [documentId],
   })
 
@@ -216,10 +216,10 @@ it("Should make introductions between N peers", async () => {
 
   const expectedIntroductions = permutationsOfTwo(peers.length)
 
-  const userNames = peers.map(userName => `peer-${userName}-${testId}`)
+  const peerIds = peers.map(peerId => `peer-${peerId}-${testId}`)
 
-  const sockets = userNames.map(
-    (userName: string) => new WebSocket(`${url}/introduction/${userName}`)
+  const sockets = peerIds.map(
+    (peerId: string) => new WebSocket(`${url}/introduction/${peerId}`)
   )
 
   const joinMessage = { type: "Join", documentIds: [documentId] }
@@ -247,12 +247,12 @@ it("Should not crash when one peer disconnects mid-introduction", async () => {
   const { documentId, url, teardown } = await setup()
   const peers = ["a", "b", "c", "d", "e"]
 
-  const userNames = peers.map(userName => `peer-${userName}-${testId}`)
+  const peerIds = peers.map(peerId => `peer-${peerId}-${testId}`)
 
   const expectedIntroductions = permutationsOfTwo(peers.length - 1) // one will misbehave
 
-  const sockets = userNames.map(
-    userName => new WebSocket(`${url}/introduction/${userName}`)
+  const sockets = peerIds.map(
+    peerId => new WebSocket(`${url}/introduction/${peerId}`)
   )
 
   const joinMessage = { type: "Join", documentIds: [documentId] }

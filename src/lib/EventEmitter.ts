@@ -7,7 +7,7 @@ export class EventEmitter<
 > extends _EventEmitter<T> {
   /** The `log` method is meant to be overridden, e.g.
    * ```ts
-   *  this.log = debug(`lf:tc:conn:${context.user.userName}`)
+   *  this.log = debug(`lf:tc:conn:${context.user.peerId}`)
    * ```
    */
   log: debug.Debugger = debug(`EventEmitter`)

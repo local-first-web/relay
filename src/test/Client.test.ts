@@ -20,9 +20,9 @@ const setup = async () => {
   const documentId = `test-documentId-${testId}`
   const documentIds = [documentId]
 
-  const alice = new Client({ userName: `a-${testId}`, url, documentIds })
-  const bob = new Client({ userName: `b-${testId}`, url, documentIds })
-  const charlie = new Client({ userName: `c-${testId}`, url, documentIds })
+  const alice = new Client({ peerId: `a-${testId}`, url, documentIds })
+  const bob = new Client({ peerId: `b-${testId}`, url, documentIds })
+  const charlie = new Client({ peerId: `c-${testId}`, url, documentIds })
 
   const teardown = async () => {
     alice.disconnectServer()
@@ -39,8 +39,8 @@ it("joins a documentId and connects to a peer", async () => {
   const { alice, bob, documentId, teardown } = await setup()
   await allConnected(alice, bob)
 
-  expect(alice.has(bob.userName, documentId)).toBe(true)
-  expect(bob.has(alice.userName, documentId)).toBe(true)
+  expect(alice.has(bob.peerId, documentId)).toBe(true)
+  expect(bob.has(alice.peerId, documentId)).toBe(true)
 
   await teardown()
 })
@@ -54,8 +54,8 @@ it("both peers have the second document", async () => {
 
   await allConnected(alice, bob, anotherDocumentId)
 
-  expect(alice.has(bob.userName, anotherDocumentId)).toBe(true)
-  expect(bob.has(alice.userName, anotherDocumentId)).toBe(true)
+  expect(alice.has(bob.peerId, anotherDocumentId)).toBe(true)
+  expect(bob.has(alice.peerId, anotherDocumentId)).toBe(true)
 
   await teardown()
 })
@@ -65,13 +65,13 @@ it("leaves a documentId", async () => {
   const { alice, bob, documentId, teardown } = await setup()
   await allConnected(alice, bob)
 
-  expect(alice.has(bob.userName, documentId)).toBe(true)
+  expect(alice.has(bob.peerId, documentId)).toBe(true)
   expect(alice.documentIds).toContain(documentId)
 
   // Alice decides she's no longer interested in this document
   alice.leave(documentId)
 
-  expect(alice.has(bob.userName, documentId)).toBe(false)
+  expect(alice.has(bob.peerId, documentId)).toBe(false)
   expect(alice.documentIds).not.toContain(documentId)
 
   await teardown()
@@ -82,12 +82,12 @@ it("Bob is disconnected from Alice and vice versa", async () => {
   const { alice, bob, documentId, teardown } = await setup()
   await allConnected(alice, bob)
 
-  alice.disconnectPeer(bob.userName)
+  alice.disconnectPeer(bob.peerId)
   await allDisconnected(alice, bob)
 
   // Bob is disconnected from Alice and vice versa
-  expect(alice.has(bob.userName, documentId)).toBe(false)
-  expect(bob.has(alice.userName, documentId)).toBe(false)
+  expect(alice.has(bob.peerId, documentId)).toBe(false)
+  expect(bob.has(alice.peerId, documentId)).toBe(false)
 
   await teardown()
 })
@@ -105,12 +105,12 @@ it("everyone is disconnected from Alice and vice versa", async () => {
   ])
 
   // Bob is disconnected from Alice and vice versa
-  expect(alice.has(bob.userName, documentId)).toBe(false)
-  expect(bob.has(alice.userName, documentId)).toBe(false)
+  expect(alice.has(bob.peerId, documentId)).toBe(false)
+  expect(bob.has(alice.peerId, documentId)).toBe(false)
 
   // Charlie is disconnected from Alice and vice versa
-  expect(alice.has(charlie.userName, documentId)).toBe(false)
-  expect(charlie.has(alice.userName, documentId)).toBe(false)
+  expect(alice.has(charlie.peerId, documentId)).toBe(false)
+  expect(charlie.has(alice.peerId, documentId)).toBe(false)
 
   await teardown()
 })
@@ -125,8 +125,8 @@ it(`she's disconnected then she's connected again`, async () => {
   await allDisconnected(alice, bob)
 
   // Alice and Bob are disconnected
-  expect(alice.has(bob.userName, documentId)).toBe(false)
-  expect(bob.has(alice.userName, documentId)).toBe(false)
+  expect(alice.has(bob.peerId, documentId)).toBe(false)
+  expect(bob.has(alice.peerId, documentId)).toBe(false)
 
   // Alice reconnects
   alice.connectToServer()
@@ -134,8 +134,8 @@ it(`she's disconnected then she's connected again`, async () => {
   await allConnected(alice, bob)
 
   // Alice and Bob are connected again
-  expect(alice.has(bob.userName, documentId)).toBe(true)
-  expect(bob.has(alice.userName, documentId)).toBe(true)
+  expect(alice.has(bob.peerId, documentId)).toBe(true)
+  expect(bob.has(alice.peerId, documentId)).toBe(true)
 
   await teardown()
 })
@@ -161,7 +161,7 @@ it("stays open when peer disconnects", async () => {
   expect(alice.open).toBe(true)
   expect(bob.open).toBe(true)
 
-  alice.disconnectPeer(bob.userName)
+  alice.disconnectPeer(bob.peerId)
   expect(alice.open).toBe(true)
   expect(bob.open).toBe(true)
 
