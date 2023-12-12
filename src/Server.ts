@@ -78,19 +78,19 @@ export class Server extends EventEmitter<ServerEvents> {
         })
 
         // Introduction request
-        .ws("/introduction/:peerId", (ws, { params: { peerId } }) => {
+        .ws("/introduction/:peerId", (socket, { params: { peerId } }) => {
           this.log("received introduction request", peerId)
-          this.openIntroductionConnection(ws, peerId)
-          this.sockets.add(ws)
+          this.openIntroductionConnection(socket, peerId)
+          this.sockets.add(socket)
         })
 
         // Connection request
         .ws(
           "/connection/:A/:B/:documentId",
-          (ws, { params: { A, B, documentId } }) => {
+          (socket, { params: { A, B, documentId } }) => {
             this.log("received connection request", A, B)
-            this.openConnection({ socket: ws, A, B, documentId })
-            this.sockets.add(ws)
+            this.openConnection({ socket, A, B, documentId })
+            this.sockets.add(socket)
           }
         )
 
