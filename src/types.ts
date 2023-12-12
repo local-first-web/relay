@@ -38,11 +38,11 @@ export namespace Message {
 }
 
 export type ClientEvents = {
-  "server.connect": () => void
-  "server.disconnect": () => void
+  "server-connect": () => void
+  "server-disconnect": () => void
   error: (err: Error) => void
-  "peer.connect": (payload: PeerEventPayload) => void
-  "peer.disconnect": (payload: PeerEventPayload) => void
+  "peer-connect": (payload: PeerEventPayload) => void
+  "peer-disconnect": (payload: PeerEventPayload) => void
 }
 export interface PeerEventPayload {
   documentId: DocumentId
@@ -63,6 +63,13 @@ export interface ClientOptions {
   minRetryDelay?: number
   maxRetryDelay?: number
   backoffFactor?: number
+}
+
+export type ServerEvents = {
+  ready: () => void
+  close: () => void
+  error: (payload: { error: Error; data: Uint8Array }) => void
+  introduction: (userName: UserName) => void
 }
 
 export type PeerSocketMap = Map<DocumentId, WebSocket | null>

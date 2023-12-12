@@ -13,15 +13,9 @@ import {
   ConnectRequestParams,
   DocumentId,
   Message,
+  ServerEvents,
   UserName,
-} from "./lib/types.js"
-
-type ServerEvents = {
-  ready: () => void
-  close: () => void
-  error: (payload: { error: Error; data: Uint8Array }) => void
-  introduction: (userName: UserName) => void
-}
+} from "./types.js"
 
 /**
  * This server provides two services:

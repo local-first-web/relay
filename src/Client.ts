@@ -12,7 +12,7 @@ import type {
   Message,
   PeerSocketMap,
   UserName,
-} from "./lib/types.js"
+} from "./types.js"
 
 const { version } = pkg
 const HEARTBEAT = pack({ type: "Heartbeat" })
@@ -36,7 +36,7 @@ export interface PeerEventPayload {
  * ```ts
  * client = new Client({ userName: 'my-peer-userName', url })
  *   .join('my-document-userName')
- *   .on('peer.connect', ({documentId, userName, socket}) => {
+ *   .on('peer-connect', ({documentId, userName, socket}) => {
  *     // send a message
  *     socket.send('Hello!')
  *
@@ -125,7 +125,7 @@ export class Client extends EventEmitter<ClientEvents> {
         this.retryDelay = this.minRetryDelay
         this.shouldReconnectIfClosed = true
         this.drainQueue()
-        this.emit("server.connect")
+        this.emit("server-connect")
         this.open = true
 
         this.heartbeat = setInterval(
@@ -159,7 +159,7 @@ export class Client extends EventEmitter<ClientEvents> {
 
             // add the socket to the map for this peer
             peer.set(documentId, peerConnection)
-            this.emit("peer.connect", {
+            this.emit("peer-connect", {
               userName,
               documentId,
               socket: peerConnection,
@@ -169,7 +169,7 @@ export class Client extends EventEmitter<ClientEvents> {
           // if the other end disconnects, we disconnect
           peerConnection.onclose = () => {
             this.closeSocket(userName, documentId)
-            this.emit("peer.disconnect", {
+            this.emit("peer-disconnect", {
               userName,
               documentId,
               socket: peerConnection,
@@ -183,7 +183,7 @@ export class Client extends EventEmitter<ClientEvents> {
 
       .on("close", () => {
         this.open = false
-        this.emit("server.disconnect")
+        this.emit("server-disconnect")
 
         // stop heartbeat
         clearInterval(this.heartbeat)

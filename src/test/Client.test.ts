@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest"
 import { Client } from "../Client.js"
 import { eventPromise } from "../lib/eventPromise.js"
 import { DocumentId, Server } from "../index.js"
-import { PeerEventPayload } from "../lib/types.js"
+import { PeerEventPayload } from "../types.js"
 import { pack, unpack } from "../lib/msgpack.js"
 import { WebSocket } from "isomorphic-ws"
 
@@ -59,33 +59,6 @@ it("both peers have the second document", async () => {
 
   await teardown()
 })
-
-// it("emits peer.connect only once per peer connection", async () => {
-//   // Alice and Bob both join a documentId
-//   const documentId = `some-other-test-documentId-${testId}`
-
-//   const { url, teardown } = await setup()
-//   let connections = 0
-//   const alice = new Client({ userName: `alice-${testId}`, url })
-
-//   alice.on("peer.connect", () => {
-//     connections++
-//     if (connections > 1) throw new Error(`peer connect emitted ${connections}x`)
-//   })
-//   const bob = new Client({ userName: `bob-${testId}`, url })
-
-//   bob.join(documentId)
-//   alice.join(documentId)
-//   alice.join(documentId)
-
-//   await allConnected(alice, bob)
-
-//   expect(alice.has(bob.userName, documentId)).toBe(true)
-//   expect(bob.has(alice.userName, documentId)).toBe(true)
-
-//   await pause(500)
-//   await teardown()
-// })
 
 it("leaves a documentId", async () => {
   // Alice and Bob both join a documentId
@@ -204,7 +177,7 @@ it("closes when server disconnects", async () => {
   expect(bob.open).toBe(true)
 
   teardown()
-  await eventPromise(alice, "server.disconnect")
+  await eventPromise(alice, "server-disconnect")
   expect(alice.open).toBe(false)
 })
 
@@ -216,7 +189,7 @@ const allDisconnected = (a: Client, b: Client) =>
 
 const connection = (a: Client, b: Client, documentId?: DocumentId) =>
   new Promise<WebSocket>(resolve =>
-    a.on("peer.connect", ({ userName, documentId: d, socket }) => {
+    a.on("peer-connect", ({ userName, documentId: d, socket }) => {
       if (
         userName === b.userName &&
         // are we waiting to connect on a specific document ID?
@@ -228,7 +201,7 @@ const connection = (a: Client, b: Client, documentId?: DocumentId) =>
 
 const disconnection = (a: Client, b: Client) =>
   new Promise<void>(resolve =>
-    a.on("peer.disconnect", ({ userName = "" }) => {
+    a.on("peer-disconnect", ({ userName = "" }) => {
       if (userName === b.userName) resolve()
     })
   )

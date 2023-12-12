@@ -5,7 +5,7 @@ import { eventPromise } from "../lib/eventPromise.js"
 import { isReady } from "../lib/isReady.js"
 import { pack, unpack } from "../lib/msgpack.js"
 import { pause } from "../lib/pause.js"
-import type { Message } from "../lib/types.js"
+import type { Message } from "../types.js"
 
 // const log = debug('lf:relay:tests')
 
