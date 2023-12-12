@@ -16,6 +16,12 @@ import {
   UserName,
 } from "./lib/types.js"
 
+type ServerEvents = {
+  ready: () => void
+  close: () => void
+  error: (payload: { error: Error; data: Uint8Array }) => void
+  introductionConnection: (userName: UserName) => void
+}
 /**
  * This server provides two services:
  *
@@ -27,7 +33,7 @@ import {
  *   (can think of it as a 'channel'). If we get matching connection requests from Alice and Bob, we
  *   just pipe their sockets together.
  */
-export class Server extends EventEmitter {
+export class Server extends EventEmitter<ServerEvents> {
   public port: number
 
   /**

@@ -192,8 +192,8 @@ export class Client extends EventEmitter<ClientEvents> {
       if (this.shouldReconnectIfClosed) this.tryToReopen()
     }
 
-    serverConnection.onerror = (ev: ErrorEvent) => {
-      this.emit("error", ev)
+    serverConnection.onerror = ({ error }) => {
+      this.emit("error", error)
     }
 
     this.serverConnection = serverConnection
