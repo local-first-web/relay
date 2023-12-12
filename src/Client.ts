@@ -1,5 +1,5 @@
 import debug from "debug"
-import WebSocket, { ErrorEvent } from "isomorphic-ws"
+import { WebSocket } from "isomorphic-ws"
 import pkg from "../package.json" assert { type: "json" }
 import { EventEmitter } from "./lib/EventEmitter.js"
 import { isReady } from "./lib/isReady.js"
@@ -118,86 +118,82 @@ export class Client extends EventEmitter<ClientEvents> {
     const url = `${this.url}/introduction/${this.userName}`
     this.log("connecting to relay server", url)
 
-    const serverConnection = new WebSocket(url)
+    this.serverConnection = new WebSocket(url)
 
-    serverConnection.onopen = async () => {
-      await isReady(serverConnection)
-      this.retryDelay = this.minRetryDelay
-      this.shouldReconnectIfClosed = true
-      this.drainQueue()
-      this.emit("server.connect")
-      this.open = true
+      .on("open", async () => {
+        await isReady(this.serverConnection)
+        this.retryDelay = this.minRetryDelay
+        this.shouldReconnectIfClosed = true
+        this.drainQueue()
+        this.emit("server.connect")
+        this.open = true
 
-      this.heartbeat = setInterval(
-        () => serverConnection.send(HEARTBEAT),
-        HEARTBEAT_INTERVAL
-      )
-    }
+        this.heartbeat = setInterval(
+          () => this.serverConnection.send(HEARTBEAT),
+          HEARTBEAT_INTERVAL
+        )
+      })
 
-    serverConnection.onmessage = messageEvent => {
-      const data = messageEvent.data as Uint8Array
-      const message = unpack(data) as Message.ServerToClient
+      .on("message", data => {
+        const message = unpack(data) as Message.ServerToClient
 
-      // The only kind of message that we receive from the relay server is an introduction, which tells
-      // us that someone else is interested in the same thing we are.
-      if (message.type !== "Introduction")
-        throw new Error(`Invalid message type '${message.type}'`)
+        // The only kind of message that we receive from the relay server is an introduction, which tells
+        // us that someone else is interested in the same thing we are.
+        if (message.type !== "Introduction")
+          throw new Error(`Invalid message type '${message.type}'`)
 
-      // When we receive that message, we respond by requesting a "direct" connection to the peer
-      // (via piped sockets on the relay server) for each document ID that we have in common
+        // When we receive that message, we respond by requesting a "direct" connection to the peer
+        // (via piped sockets on the relay server) for each document ID that we have in common
 
-      const connectToPeer = (documentId: DocumentId, userName: UserName) => {
-        const peer = this.get(userName)
-        if (peer.has(documentId)) return // don't add twice
-        peer.set(documentId, null)
+        const connectToPeer = (documentId: DocumentId, userName: UserName) => {
+          const peer = this.get(userName)
+          if (peer.has(documentId)) return // don't add twice
+          peer.set(documentId, null)
 
-        const url = `${this.url}/connection/${this.userName}/${userName}/${documentId}`
-        const peerConnection = new WebSocket(url)
+          const url = `${this.url}/connection/${this.userName}/${userName}/${documentId}`
+          const peerConnection = new WebSocket(url)
 
-        peerConnection.onopen = async () => {
-          // make sure the socket is actually in READY state
-          await isReady(peerConnection)
+          peerConnection.on("open", async () => {
+            // make sure the socket is actually in READY state
+            await isReady(peerConnection)
 
-          // add the socket to the map for this peer
-          peer.set(documentId, peerConnection)
-          this.emit("peer.connect", {
-            userName,
-            documentId,
-            socket: peerConnection,
-          } as PeerEventPayload)
+            // add the socket to the map for this peer
+            peer.set(documentId, peerConnection)
+            this.emit("peer.connect", {
+              userName,
+              documentId,
+              socket: peerConnection,
+            } as PeerEventPayload)
+          })
+
+          // if the other end disconnects, we disconnect
+          peerConnection.onclose = () => {
+            this.closeSocket(userName, documentId)
+            this.emit("peer.disconnect", {
+              userName,
+              documentId,
+              socket: peerConnection,
+            } as PeerEventPayload)
+          }
         }
 
-        // if the other end disconnects, we disconnect
-        peerConnection.onclose = () => {
-          this.closeSocket(userName, documentId)
-          this.emit("peer.disconnect", {
-            userName,
-            documentId,
-            socket: peerConnection,
-          } as PeerEventPayload)
-        }
-      }
+        const { userName, documentIds = [] } = message
+        documentIds.forEach(documentId => connectToPeer(documentId, userName))
+      })
 
-      const { userName, documentIds = [] } = message
-      documentIds.forEach(documentId => connectToPeer(documentId, userName))
-    }
+      .on("close", () => {
+        this.open = false
+        this.emit("server.disconnect")
 
-    serverConnection.onclose = () => {
-      this.open = false
-      this.emit("server.disconnect")
+        // stop heartbeat
+        clearInterval(this.heartbeat)
 
-      // stop heartbeat
-      clearInterval(this.heartbeat)
+        if (this.shouldReconnectIfClosed) this.tryToReopen()
+      })
 
-      if (this.shouldReconnectIfClosed) this.tryToReopen()
-    }
-
-    serverConnection.onerror = ({ error }) => {
-      this.emit("error", error)
-    }
-
-    this.serverConnection = serverConnection
-    return this.serverConnection
+      .on("error", error => {
+        this.emit("error", error)
+      })
   }
 
   /** Try to reconnect after a delay  */
