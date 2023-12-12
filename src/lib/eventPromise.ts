@@ -1,6 +1,3 @@
-import { type EventEmitter } from "eventemitter3"
-import { WebSocket } from "isomorphic-ws"
-
 /** Returns a promise that resolves when the given event is emitted on the given emitter. */
 export const eventPromise = async (emitter: Emitter, event: string) =>
   new Promise<any>(resolve => {
@@ -12,4 +9,6 @@ export const eventPromises = async (emitters: Emitter[], event: string) => {
   return Promise.all(promises)
 }
 
-type Emitter = EventEmitter | WebSocket
+interface Emitter {
+  once(event: string, listener: (data?: any) => void): void
+}
