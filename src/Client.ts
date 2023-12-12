@@ -1,9 +1,9 @@
-import debug, { Debugger } from "debug"
+import debug from "debug"
 import WebSocket, { ErrorEvent } from "isomorphic-ws"
-import { pack, unpack } from "./lib/msgpack.js"
-import pkg from "../package.json"
+import pkg from "../package.json" assert { type: "json" }
 import { EventEmitter } from "./lib/EventEmitter.js"
 import { isReady } from "./lib/isReady.js"
+import { pack, unpack } from "./lib/msgpack.js"
 import { newid } from "./lib/newid.js"
 import type {
   ClientOptions,
@@ -28,7 +28,7 @@ export interface PeerEventPayload {
  * for each peer it keeps track of each documentId (aka discoveryKey, aka channel) that you're
  * working with that peer on.
  *
- * The peers are WebSocket instances
+ * The peers are WebSocket instances.
  *
  * The simplest workflow is something like this:
  *
@@ -40,8 +40,7 @@ export interface PeerEventPayload {
  *     socket.send('Hello!')
  *
  *     // listen for messages
- *     socket.onmessage = (e) => {
- *       const { data } = e
+ *     socket.onmessage = ({ data }) => {
  *       console.log(data)
  *     }
  *   })
@@ -67,21 +66,21 @@ export class Client extends EventEmitter {
   /** Is the connection to the server currently open? */
   public open: boolean
 
-  public log: Debugger
-
-  private serverConnection: WebSocket
-
   /** If the connection is closed, do we want to reopen it? */
   private shouldReconnectIfClosed: boolean = true
 
+  /** Parameters for retries */
   private minRetryDelay: number
   private maxRetryDelay: number
   private backoffFactor: number
+
   private heartbeat: ReturnType<typeof setInterval>
+
+  private serverConnection: WebSocket
   private serverConnectionQueue: Message.ClientToServer[] = []
 
   /**
-   * @param userName a string that identifies you uniquely, defaults to a UUID
+   * @param userName a string that identifies you uniquely, defaults to a CUID
    * @param url the url of the `relay`, e.g. `http://myrelay.mydomain.com`
    * @param documentIds one or more document IDs that you're interested in
    */
