@@ -1,5 +1,5 @@
 import debug from "debug"
-import { WebSocket } from "isomorphic-ws"
+import { RawData, WebSocket } from "isomorphic-ws"
 import pkg from "../package.json" assert { type: "json" }
 import { EventEmitter } from "./lib/EventEmitter.js"
 import { isReady } from "./lib/isReady.js"
@@ -74,6 +74,7 @@ export class Client extends EventEmitter<ClientEvents> {
   private maxRetryDelay: number
   private backoffFactor: number
 
+  /** Reference to the heartbeat interval */
   private heartbeat: ReturnType<typeof setInterval>
 
   private serverConnection: WebSocket
@@ -109,6 +110,8 @@ export class Client extends EventEmitter<ClientEvents> {
     documentIds.forEach(id => this.join(id))
   }
 
+  // PUBLIC API
+
   /**
    * Connects to the relay server, lets it know what documents we're interested in
    * @param documentIds array of IDs of documents we're interested in
@@ -119,100 +122,18 @@ export class Client extends EventEmitter<ClientEvents> {
     this.log("connecting to relay server", url)
 
     this.serverConnection = new WebSocket(url)
-
-      .on("open", async () => {
-        await isReady(this.serverConnection)
-        this.retryDelay = this.minRetryDelay
-        this.shouldReconnectIfClosed = true
-        this.sendPendingMessages()
-        this.emit("server-connect")
-        this.open = true
-
-        this.heartbeat = setInterval(
-          () => this.serverConnection.send(HEARTBEAT),
-          HEARTBEAT_INTERVAL
-        )
+      .on("open", () => {
+        this.onServerOpen()
       })
-
       .on("message", data => {
-        const message = unpack(data) as Message.ServerToClient
-
-        // The only kind of message that we receive from the relay server is an introduction, which tells
-        // us that someone else is interested in the same thing we are.
-        if (message.type !== "Introduction")
-          throw new Error(`Invalid message type '${message.type}'`)
-
-        // When we receive that message, we respond by requesting a "direct" connection to the peer
-        // (via piped sockets on the relay server) for each document ID that we have in common
-
-        const connectToPeer = (documentId: DocumentId, userName: UserName) => {
-          const peer = this.get(userName)
-          if (peer.has(documentId)) return // don't add twice
-          peer.set(documentId, null)
-
-          const url = `${this.url}/connection/${this.userName}/${userName}/${documentId}`
-          const peerConnection = new WebSocket(url)
-
-          peerConnection
-            .on("open", async () => {
-              // make sure the socket is actually in READY state
-              await isReady(peerConnection)
-
-              // add the socket to the map for this peer
-              peer.set(documentId, peerConnection)
-              this.emit("peer-connect", {
-                userName,
-                documentId,
-                socket: peerConnection,
-              } as PeerEventPayload)
-            })
-
-            // if the other end disconnects, we disconnect
-            .on("close", () => {
-              this.closeSocket(userName, documentId)
-              this.emit("peer-disconnect", {
-                userName,
-                documentId,
-                socket: peerConnection,
-              } as PeerEventPayload)
-            })
-        }
-
-        const { userName, documentIds = [] } = message
-        documentIds.forEach(documentId => connectToPeer(documentId, userName))
+        this.onServerMessage(data)
       })
-
       .on("close", () => {
-        this.open = false
-        this.emit("server-disconnect")
-
-        // stop heartbeat
-        clearInterval(this.heartbeat)
-
-        if (this.shouldReconnectIfClosed) this.tryToReopen()
+        this.onServerClose()
       })
-
       .on("error", error => {
-        this.emit("error", error)
+        this.onServerError(error)
       })
-  }
-
-  /** Try to reconnect after a delay  */
-  private tryToReopen() {
-    setTimeout(() => {
-      this.connectToServer()
-      this.documentIds.forEach(id => this.join(id))
-    }, this.retryDelay)
-
-    // increase the delay for next time
-    if (this.retryDelay < this.maxRetryDelay)
-      this.retryDelay *= this.backoffFactor + Math.random() * 0.1 - 0.05 // randomly vary the delay
-
-    this.log(
-      `Relay connection closed. Retrying in ${Math.floor(
-        this.retryDelay / 1000
-      )}s`
-    )
   }
 
   /**
@@ -296,6 +217,81 @@ export class Client extends EventEmitter<ClientEvents> {
     }
   }
 
+  // PRIVATE
+
+  /**
+   * When we connect to the server, we set up a heartbeat to keep the connection alive, and we send
+   * any pending messages that we weren't able to send before.
+   */
+  private async onServerOpen() {
+    await isReady(this.serverConnection)
+    this.retryDelay = this.minRetryDelay
+    this.shouldReconnectIfClosed = true
+    this.sendPendingMessages()
+    this.open = true
+    this.heartbeat = setInterval(
+      () => this.serverConnection.send(HEARTBEAT),
+      HEARTBEAT_INTERVAL
+    )
+    this.emit("server-connect")
+  }
+
+  /**
+   * The only kind of message that we receive from the relay server is an introduction, which tells
+   * us that someone else is interested in the same thing we are.
+   */
+  private onServerMessage(data: RawData) {
+    const message = unpack(data) as Message.ServerToClient
+
+    if (message.type !== "Introduction")
+      throw new Error(`Invalid message type '${message.type}'`)
+
+    const { userName, documentIds = [] } = message
+    documentIds.forEach(documentId => {
+      this.connectToPeer(documentId, userName)
+    })
+  }
+
+  /**
+   * When we receive an introduction message, we respond by requesting a "direct" connection to the
+   * peer (via piped sockets on the relay server) for each document ID that we have in common
+   */
+  private connectToPeer(documentId: DocumentId, userName: UserName) {
+    const peer = this.get(userName)
+    if (peer.has(documentId)) return // don't add twice
+    peer.set(documentId, null)
+
+    const url = `${this.url}/connection/${this.userName}/${userName}/${documentId}`
+    const socket = new WebSocket(url)
+
+    socket
+      .on("open", async () => {
+        // make sure the socket is actually in READY state
+        await isReady(socket)
+        // add the socket to the map for this peer
+        peer.set(documentId, socket)
+        this.emit("peer-connect", { userName, documentId, socket })
+      })
+
+      // if the other end disconnects, we disconnect
+      .on("close", () => {
+        this.closeSocket(userName, documentId)
+        this.emit("peer-disconnect", { userName, documentId, socket })
+      })
+  }
+
+  private onServerClose() {
+    this.open = false
+    this.emit("server-disconnect")
+    clearInterval(this.heartbeat)
+    if (this.shouldReconnectIfClosed) this.tryToReopen()
+  }
+
+  private onServerError(error: Error) {
+    this.emit("error", error)
+  }
+
+  /** Send any messages we were given before the server was ready */
   private sendPendingMessages() {
     while (this.pendingMessages.length) {
       let message = this.pendingMessages.shift()!
@@ -303,6 +299,25 @@ export class Client extends EventEmitter<ClientEvents> {
     }
   }
 
+  /** Try to reconnect after a delay  */
+  private tryToReopen() {
+    setTimeout(() => {
+      this.connectToServer()
+      this.documentIds.forEach(id => this.join(id))
+    }, this.retryDelay)
+
+    // increase the delay for next time
+    if (this.retryDelay < this.maxRetryDelay)
+      this.retryDelay *= this.backoffFactor + Math.random() * 0.1 - 0.05 // randomly vary the delay
+
+    this.log(
+      `Relay connection closed. Retrying in ${Math.floor(
+        this.retryDelay / 1000
+      )}s`
+    )
+  }
+
+  /** Send a message to the server */
   private async send(message: Message.ClientToServer) {
     await isReady(this.serverConnection)
     try {
