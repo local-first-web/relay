@@ -7,8 +7,6 @@ import { pack, unpack } from "../lib/msgpack.js"
 import { pause } from "../lib/pause.js"
 import type { Message } from "../types.js"
 
-// const log = debug('lf:relay:tests')
-
 /**
  * In this context:
  * - `userName` is always a peer userName.
@@ -156,16 +154,18 @@ it("should pipe connections between two peers", async () => {
     `${url}/connection/${bobId}/${aliceId}/${documentId}`
   )
 
-  // send message from local to remote
-  alice.once("open", () => alice.send(pack("DUDE!!")))
-  bob.once("message", data => {
-    expect(unpack(data)).toEqual("DUDE!!")
-  })
+  await Promise.all([eventPromise(alice, "open"), eventPromise(bob, "open")])
 
-  // send message from remote to local
-  bob.once("open", () => bob.send(pack("hello")))
-  const data = await eventPromise(alice, "message")
-  expect(unpack(data)).toEqual("hello")
+  // send message from alice to bob
+  alice.send(pack("DUDE!!"))
+
+  const aliceMessage = await eventPromise(bob, "message")
+  expect(unpack(aliceMessage)).toEqual("DUDE!!")
+
+  // send message from bob to alice
+  bob.send(pack("hello"))
+  const bobMessage = await eventPromise(alice, "message")
+  expect(unpack(bobMessage)).toEqual("hello")
 
   await teardown(alice, bob)
 })
@@ -186,19 +186,26 @@ it("should close a peer when asked to", async () => {
   )
 
   await eventPromise(alice, "open")
+
+  // Alice sends a message
   alice.send(pack("hey bob!"))
+
+  // She then closes the connection
   alice.close()
 
-  const d = await eventPromise(bob, "message")
-  expect(unpack(d)).toEqual("hey bob!")
+  // Bob receives the message
+  await eventPromise(bob, "message")
 
+  // Bob sends a message back
   bob.send(pack("sup alice"))
 
-  alice.once("message", () => {
-    throw new Error("should never get here")
-  })
+  // Alice should not receive the message, because her connection is closed
+  const aliceReceivedMessage = await Promise.race([
+    eventPromise(alice, "message").then(() => true),
+    pause(100).then(() => false),
+  ])
+  expect(aliceReceivedMessage).toBe(false)
 
-  await pause(100)
   await teardown(alice, bob)
 })
 
@@ -216,25 +223,23 @@ it("Should make introductions between N peers", async () => {
 
   const joinMessage = { type: "Join", documentIds: [documentId] }
   sockets.forEach(async (socket: WebSocket) => {
-    socket.onopen = () => {
+    socket.on("open", () => {
       socket.send(pack(joinMessage))
-    }
+    })
   })
 
   const introductions = await new Promise<number>(resolve => {
     let introductions = 0
     sockets.forEach(socket => {
-      socket.onmessage = () => {
+      socket.on("message", () => {
         introductions += 1
-        if (introductions === expectedIntroductions) {
-          resolve(introductions)
-        }
-      }
+        if (introductions === expectedIntroductions) resolve(introductions)
+      })
     })
   })
   expect(introductions).toBe(expectedIntroductions)
 
-  await teardown()
+  await teardown(...sockets)
 })
 
 it("Should not crash when one peer disconnects mid-introduction", async () => {
@@ -251,21 +256,21 @@ it("Should not crash when one peer disconnects mid-introduction", async () => {
 
   const joinMessage = { type: "Join", documentIds: [documentId] }
   sockets.forEach(async (socket, i) => {
-    socket.onopen = () => {
+    socket.on("open", () => {
       socket.send(pack(joinMessage))
       if (i === 0) socket.close() // <- misbehaving node
-    }
+    })
   })
 
   const introductions = await new Promise<number>(resolve => {
     let introductions = 0
     sockets.forEach(socket => {
-      socket.onmessage = () => {
+      socket.on("message", () => {
         introductions += 1
         if (introductions === expectedIntroductions) {
           resolve(introductions)
         }
-      }
+      })
     })
   })
   expect(introductions).toBe(expectedIntroductions)

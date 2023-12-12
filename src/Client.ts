@@ -41,9 +41,9 @@ export interface PeerEventPayload {
  *     socket.send('Hello!')
  *
  *     // listen for messages
- *     socket.onmessage = ({ data }) => {
+ *     socket.on("message", data => {
  *       console.log(data)
- *     }
+ *     })
  *   })
  * ```
  */
@@ -153,28 +153,29 @@ export class Client extends EventEmitter<ClientEvents> {
           const url = `${this.url}/connection/${this.userName}/${userName}/${documentId}`
           const peerConnection = new WebSocket(url)
 
-          peerConnection.on("open", async () => {
-            // make sure the socket is actually in READY state
-            await isReady(peerConnection)
+          peerConnection
+            .on("open", async () => {
+              // make sure the socket is actually in READY state
+              await isReady(peerConnection)
 
-            // add the socket to the map for this peer
-            peer.set(documentId, peerConnection)
-            this.emit("peer-connect", {
-              userName,
-              documentId,
-              socket: peerConnection,
-            } as PeerEventPayload)
-          })
+              // add the socket to the map for this peer
+              peer.set(documentId, peerConnection)
+              this.emit("peer-connect", {
+                userName,
+                documentId,
+                socket: peerConnection,
+              } as PeerEventPayload)
+            })
 
-          // if the other end disconnects, we disconnect
-          peerConnection.onclose = () => {
-            this.closeSocket(userName, documentId)
-            this.emit("peer-disconnect", {
-              userName,
-              documentId,
-              socket: peerConnection,
-            } as PeerEventPayload)
-          }
+            // if the other end disconnects, we disconnect
+            .on("close", () => {
+              this.closeSocket(userName, documentId)
+              this.emit("peer-disconnect", {
+                userName,
+                documentId,
+                socket: peerConnection,
+              } as PeerEventPayload)
+            })
         }
 
         const { userName, documentIds = [] } = message
