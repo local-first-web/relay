@@ -73,7 +73,9 @@ export class Server extends EventEmitter<ServerEvents> {
     return new Promise<void>((resolve, reject) => {
       this.app
         // Allow hitting this server from a browser as a sanity check
-        .get("/", (_, res) => res.send(logoPage).end())
+        .get("/", (_, res) => {
+          res.send(logoPage).end()
+        })
 
         // Introduction request
         .ws("/introduction/:userName", (ws, { params: { userName } }) => {
@@ -180,6 +182,7 @@ export class Server extends EventEmitter<ServerEvents> {
 
   private send(peer: WebSocket, message: Message.ServerToClient) {
     if (peer && peer.readyState === WebSocket.OPEN) {
+      // We catch that so that any transient socket errors don't crash the server
       try {
         peer.send(pack(message))
       } catch (err) {
@@ -264,8 +267,6 @@ const tryParse = <T>(s: Uint8Array): T | Error => {
 }
 
 const { version } = pkg
-
-// const { app } = expressWs(express())
 
 const logoPage = `
   <body style="background:black; display:flex; justify-content:center; align-items:center">
