@@ -6,6 +6,7 @@ import { isReady } from "./lib/isReady.js"
 import { pack, unpack } from "./lib/msgpack.js"
 import { newid } from "./lib/newid.js"
 import type {
+  ClientEvents,
   ClientOptions,
   DocumentId,
   Message,
@@ -46,8 +47,7 @@ export interface PeerEventPayload {
  *   })
  * ```
  */
-export class Client extends EventEmitter {
-  //  export class Client extends (EventEmitter as new () => TypedEmitter<ClientEvents>) {
+export class Client extends EventEmitter<ClientEvents> {
   public userName: UserName
 
   /** The base URL of the relay server */

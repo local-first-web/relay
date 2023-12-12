@@ -2,7 +2,9 @@
 import debug from "debug"
 
 /** EventEmitter with built-in logging */
-export class EventEmitter extends _EventEmitter {
+export class EventEmitter<
+  T extends _EventEmitter.ValidEventTypes,
+> extends _EventEmitter<T> {
   /** The `log` method is meant to be overridden, e.g.
    * ```ts
    *  this.log = debug(`lf:tc:conn:${context.user.userName}`)
@@ -10,7 +12,10 @@ export class EventEmitter extends _EventEmitter {
    */
   log: debug.Debugger = debug(`EventEmitter`)
 
-  public emit(event: string | symbol, ...args: any[]) {
+  public emit(
+    event: _EventEmitter.EventNames<T>,
+    ...args: _EventEmitter.EventArgs<T, _EventEmitter.EventNames<T>>
+  ) {
     this.log(`${event.toString()} %o`, ...args)
     return super.emit(event, ...args)
   }
