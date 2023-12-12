@@ -6,6 +6,7 @@ import { isReady } from "../lib/isReady.js"
 import { pack, unpack } from "../lib/msgpack.js"
 import { pause } from "../lib/pause.js"
 import type { Message } from "../types.js"
+import { permutationsOfTwo } from "./helpers/permutationsOfTwo.js"
 
 /**
  * In this context:
@@ -277,6 +278,3 @@ it("Should not crash when one peer disconnects mid-introduction", async () => {
 
   await teardown(...sockets)
 })
-
-const permutationsOfTwo = (n: number) => factorial(n) / factorial(n - 2)
-const factorial = (n: number): number => (n === 1 ? 1 : n * factorial(n - 1))

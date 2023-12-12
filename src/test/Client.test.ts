@@ -1,11 +1,11 @@
-import { getPortPromise as getAvailablePort } from "portfinder"
-import { describe, expect, it } from "vitest"
+import { pause } from "../lib/pause.js"
+import { expect, it } from "vitest"
 import { Client } from "../Client.js"
+import { Server } from "../index.js"
 import { eventPromise } from "../lib/eventPromise.js"
-import { DocumentId, Server } from "../index.js"
-import { PeerEventPayload } from "../types.js"
 import { pack, unpack } from "../lib/msgpack.js"
-import { WebSocket } from "isomorphic-ws"
+import { allConnected } from "./helpers/allConnected.js"
+import { allDisconnected } from "./helpers/allDisconnected.js"
 
 let testId = 0
 
@@ -180,31 +180,3 @@ it("closes when server disconnects", async () => {
   await eventPromise(alice, "server-disconnect")
   expect(alice.open).toBe(false)
 })
-
-const allConnected = (a: Client, b: Client, documentId?: DocumentId) =>
-  Promise.all([connection(a, b, documentId), connection(b, a, documentId)])
-
-const allDisconnected = (a: Client, b: Client) =>
-  Promise.all([disconnection(a, b), disconnection(b, a)])
-
-const connection = (a: Client, b: Client, documentId?: DocumentId) =>
-  new Promise<WebSocket>(resolve =>
-    a.on("peer-connect", ({ userName, documentId: d, socket }) => {
-      if (
-        userName === b.userName &&
-        // are we waiting to connect on a specific document ID?
-        (documentId === undefined || documentId === d)
-      )
-        resolve(socket)
-    })
-  )
-
-const disconnection = (a: Client, b: Client) =>
-  new Promise<void>(resolve =>
-    a.on("peer-disconnect", ({ userName = "" }) => {
-      if (userName === b.userName) resolve()
-    })
-  )
-
-const pause = (t = 100) =>
-  new Promise<void>(resolve => setTimeout(() => resolve(), t))

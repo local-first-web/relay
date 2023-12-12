@@ -77,7 +77,7 @@ export class Client extends EventEmitter<ClientEvents> {
   private heartbeat: ReturnType<typeof setInterval>
 
   private serverConnection: WebSocket
-  private serverConnectionQueue: Message.ClientToServer[] = []
+  private pendingMessages: Message.ClientToServer[] = []
 
   /**
    * @param userName a string that identifies you uniquely, defaults to a CUID
@@ -124,7 +124,7 @@ export class Client extends EventEmitter<ClientEvents> {
         await isReady(this.serverConnection)
         this.retryDelay = this.minRetryDelay
         this.shouldReconnectIfClosed = true
-        this.drainQueue()
+        this.sendPendingMessages()
         this.emit("server-connect")
         this.open = true
 
@@ -296,9 +296,9 @@ export class Client extends EventEmitter<ClientEvents> {
     }
   }
 
-  private drainQueue() {
-    while (this.serverConnectionQueue.length) {
-      let message = this.serverConnectionQueue.shift()!
+  private sendPendingMessages() {
+    while (this.pendingMessages.length) {
+      let message = this.pendingMessages.shift()!
       this.send(message)
     }
   }
@@ -309,7 +309,7 @@ export class Client extends EventEmitter<ClientEvents> {
       const msgBytes = pack(message)
       this.serverConnection.send(msgBytes)
     } catch (err) {
-      this.serverConnectionQueue.push(message)
+      this.pendingMessages.push(message)
     }
   }
 
