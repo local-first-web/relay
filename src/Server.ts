@@ -64,7 +64,7 @@ export class Server extends EventEmitter<ServerEvents> {
     this.socket = new WebSocketServer({ noServer: true })
 
     this.log = debug(`lf:relay:${port}`)
-    this.log("version", version)
+    this.log("version", pkg.version)
   }
 
   // SERVER
@@ -78,11 +78,14 @@ export class Server extends EventEmitter<ServerEvents> {
         })
 
         // Introduction request
-        .ws("/introduction/:peerId", (socket, { params: { peerId } }) => {
-          this.log("received introduction request", peerId)
-          this.openIntroductionConnection(socket, peerId)
-          this.sockets.add(socket)
-        })
+        .ws(
+          "/introduction/:peerId", //
+          (socket, { params: { peerId } }) => {
+            this.log("received introduction request", peerId)
+            this.openIntroductionConnection(socket, peerId)
+            this.sockets.add(socket)
+          }
+        )
 
         // Connection request
         .ws(
@@ -114,7 +117,7 @@ export class Server extends EventEmitter<ServerEvents> {
       socket.close()
       socket.terminate()
     })
-    return this.app.removeAllListeners()
+    this.app.removeAllListeners()
   }
 
   // DISCOVERY
@@ -122,8 +125,9 @@ export class Server extends EventEmitter<ServerEvents> {
   private openIntroductionConnection(socket: WebSocket, peerId: PeerId) {
     this.peers[peerId] = socket
 
-    socket.on("message", this.handleIntroductionRequest(peerId))
-    socket.on("close", this.closeIntroductionConnection(peerId))
+    socket
+      .on("message", this.handleIntroductionRequest(peerId))
+      .on("close", this.closeIntroductionConnection(peerId))
 
     this.emit("introduction", peerId)
   }
@@ -133,9 +137,16 @@ export class Server extends EventEmitter<ServerEvents> {
       const A = peerId // A and B always refer to peer peerIds
       const currentDocumentIds = this.documentIds[A] ?? []
 
+      const tryParse = <T>(s: Uint8Array): T | Error => {
+        try {
+          return unpack(s)
+        } catch (error: any) {
+          return new Error(error.toString())
+        }
+      }
+
       const message = tryParse<Message.ClientToServer>(data)
       if (message instanceof Error) {
-        // console.log("ERROR", message)
         this.emit("error", { error: message, data })
         return
       }
@@ -219,7 +230,7 @@ export class Server extends EventEmitter<ServerEvents> {
 
   private openConnection({ socket, A, B, documentId }: ConnectRequestParams) {
     const socketA = socket
-    // A and B always refer to peer peerIds.
+    // A and B always refer to peerIds.
 
     // `AseeksB` and `BseeksA` are keys for identifying this request and the reciprocal request
     // (which may or may not have already come in)
@@ -231,7 +242,6 @@ export class Server extends EventEmitter<ServerEvents> {
 
     if (this.holding[BseeksA]) {
       // We already have a connection request from Bob; hook them up
-
       const { socket: socketB, messages } = this.holding[BseeksA]
 
       this.log(
@@ -260,16 +270,6 @@ export class Server extends EventEmitter<ServerEvents> {
     }
   }
 }
-
-const tryParse = <T>(s: Uint8Array): T | Error => {
-  try {
-    return unpack(s)
-  } catch (error: any) {
-    return new Error(error.toString())
-  }
-}
-
-const { version } = pkg
 
 const logoPage = `
   <body style="background:black; display:flex; justify-content:center; align-items:center">
