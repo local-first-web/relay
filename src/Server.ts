@@ -101,7 +101,10 @@ export class Server extends EventEmitter<ServerEvents> {
           resolve()
         })
 
-        .on("error", reject)
+        .on("error", error => {
+          if (!silent) console.error(error)
+          reject()
+        })
     })
   }
 
