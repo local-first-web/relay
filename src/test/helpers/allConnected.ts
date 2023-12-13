@@ -1,7 +1,7 @@
 import { Client } from "../../Client.js"
 import { DocumentId } from "../../index.js"
 import { connection } from "./connection.js"
-import { WebSocket } from "isomorphic-ws"
+import WebSocket from "isomorphic-ws"
 
 export const allConnected = (a: Client, b: Client, documentId?: DocumentId) =>
   Promise.all<WebSocket>([

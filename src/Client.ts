@@ -1,5 +1,5 @@
 import debug from "debug"
-import { RawData, WebSocket } from "isomorphic-ws"
+import WebSocket from "isomorphic-ws"
 import pkg from "../package.json" assert { type: "json" }
 import { EventEmitter } from "./lib/EventEmitter.js"
 import { isReady } from "./lib/isReady.js"
@@ -10,8 +10,8 @@ import type {
   ClientOptions,
   DocumentId,
   Message,
-  PeerSocketMap,
   PeerId,
+  PeerSocketMap,
 } from "./types.js"
 
 const { version } = pkg
@@ -36,12 +36,12 @@ export interface PeerEventPayload {
  * ```ts
  * client = new Client({ peerId: 'my-peer-peerId', url })
  *   .join('my-document-peerId')
- *   .on('peer-connect', ({documentId, peerId, socket}) => {
+ *   .addEventListener('peer-connect', ({documentId, peerId, socket}) => {
  *     // send a message
  *     socket.send('Hello!')
  *
  *     // listen for messages
- *     socket.on("message", data => {
+ *     socket.addEventListener("message", { data } => {
  *       console.log(data)
  *     })
  *   })
@@ -122,18 +122,20 @@ export class Client extends EventEmitter<ClientEvents> {
     this.log("connecting to relay server", url)
 
     this.serverConnection = new WebSocket(url)
-      .on("open", () => {
-        this.onServerOpen()
-      })
-      .on("message", data => {
-        this.onServerMessage(data)
-      })
-      .on("close", () => {
-        this.onServerClose()
-      })
-      .on("error", error => {
-        this.onServerError(error)
-      })
+    this.serverConnection.binaryType = "arraybuffer"
+
+    this.serverConnection.addEventListener("open", () => {
+      this.onServerOpen()
+    })
+    this.serverConnection.addEventListener("message", event => {
+      this.onServerMessage(event)
+    })
+    this.serverConnection.addEventListener("close", () => {
+      this.onServerClose()
+    })
+    this.serverConnection.addEventListener("error", event => {
+      this.onServerError(event)
+    })
   }
 
   /**
@@ -238,7 +240,7 @@ export class Client extends EventEmitter<ClientEvents> {
    * The only kind of message that we receive from the relay server is an introduction, which tells
    * us that someone else is interested in the same thing we are.
    */
-  private onServerMessage(data: RawData) {
+  private onServerMessage({ data }: WebSocket.MessageEvent) {
     const message = unpack(data) as Message.ServerToClient
 
     if (message.type !== "Introduction")
@@ -261,21 +263,21 @@ export class Client extends EventEmitter<ClientEvents> {
 
     const url = `${this.url}/connection/${this.peerId}/${peerId}/${documentId}`
     const socket = new WebSocket(url)
+    socket.binaryType = "arraybuffer"
 
-    socket
-      .on("open", async () => {
-        // make sure the socket is actually in READY state
-        await isReady(socket)
-        // add the socket to the map for this peer
-        peer.set(documentId, socket)
-        this.emit("peer-connect", { peerId, documentId, socket })
-      })
+    socket.addEventListener("open", async () => {
+      // make sure the socket is actually in READY state
+      await isReady(socket)
+      // add the socket to the map for this peer
+      peer.set(documentId, socket)
+      this.emit("peer-connect", { peerId, documentId, socket })
+    })
 
-      // if the other end disconnects, we disconnect
-      .on("close", () => {
-        this.closeSocket(peerId, documentId)
-        this.emit("peer-disconnect", { peerId, documentId, socket })
-      })
+    // if the other end disconnects, we disconnect
+    socket.addEventListener("close", () => {
+      this.closeSocket(peerId, documentId)
+      this.emit("peer-disconnect", { peerId, documentId, socket })
+    })
   }
 
   private onServerClose() {
@@ -285,14 +287,14 @@ export class Client extends EventEmitter<ClientEvents> {
     if (this.shouldReconnectIfClosed) this.tryToReopen()
   }
 
-  private onServerError(error: Error) {
+  private onServerError({ error }: WebSocket.ErrorEvent) {
     this.emit("error", error)
   }
 
   /** Send any messages we were given before the server was ready */
   private sendPendingMessages() {
     while (this.pendingMessages.length) {
-      let message = this.pendingMessages.shift()!
+      const message = this.pendingMessages.shift()!
       this.send(message)
     }
   }

@@ -1,9 +1,8 @@
 import debug from "debug"
 import express from "express"
 import expressWs, { Application } from "express-ws"
-import { WebSocket, WebSocketServer } from "isomorphic-ws"
+import WebSocket, { WebSocketServer } from "ws"
 import { pack, unpack } from "msgpackr"
-import { Socket as HttpSocket } from "net"
 import pkg from "../package.json" assert { type: "json" }
 import { EventEmitter } from "./lib/EventEmitter.js"
 import { deduplicate } from "./lib/deduplicate.js"

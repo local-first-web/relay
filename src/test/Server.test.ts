@@ -1,4 +1,4 @@
-import { WebSocket } from "isomorphic-ws"
+import WebSocket from "isomorphic-ws"
 import { expect, it } from "vitest"
 import { Server } from "../Server.js"
 import { eventPromise } from "../lib/eventPromise.js"
