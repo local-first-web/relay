@@ -29,6 +29,9 @@ importers:
       msgpackr:
         specifier: ^1.10.0
         version: 1.10.0
+      ws:
+        specifier: ^8.15.0
+        version: 8.15.0
     devDependencies:
       '@types/debug':
         specifier: ^4.1.12
@@ -42,6 +45,9 @@ importers:
       '@types/node':
         specifier: ^20.10.4
         version: 20.10.4
+      '@types/ws':
+        specifier: ^8.5.10
+        version: 8.5.10
       cross-env:
         specifier: ^7.0.3
         version: 7.0.3
