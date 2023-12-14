@@ -1,7 +1,7 @@
 import { pause } from "../lib/pause.js"
 import { expect, it } from "vitest"
 import { Client } from "../Client.js"
-import { Server } from "../index.js"
+import { Server } from "../Server.js"
 import { eventPromise } from "../lib/eventPromise.js"
 import { pack, unpack } from "../lib/msgpack.js"
 import { allConnected } from "./helpers/allConnected.js"

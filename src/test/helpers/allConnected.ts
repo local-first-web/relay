@@ -1,5 +1,5 @@
 import { Client } from "../../Client.js"
-import { DocumentId } from "../../index.js"
+import { DocumentId } from "../../types.js"
 import { connection } from "./connection.js"
 import WebSocket from "isomorphic-ws"
 

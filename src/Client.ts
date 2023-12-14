@@ -41,8 +41,9 @@ export interface PeerEventPayload {
  *     socket.send('Hello!')
  *
  *     // listen for messages
- *     socket.addEventListener("message", { data } => {
- *       console.log(data)
+ *     socket.addEventListener("message", (event) => {
+ *       const message = event.data
+ *       console.log(message)
  *     })
  *   })
  * ```
