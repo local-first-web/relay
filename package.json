@@ -17,6 +17,9 @@
       "types": "./dist/types.ts"
     }
   },
+  "engines": {
+    "node": ">=18.0.0"
+  },
   "scripts": {
     "prebuild": "rimraf dist",
     "build": "tsc -p tsconfig.build.json",
