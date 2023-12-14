@@ -7,13 +7,16 @@
   "license": "MIT",
   "type": "module",
   "private": false,
-  "main": "./dist/index.js",
   "exports": {
-    ".": "./dist/index.js",
-    "./Client.js": "./dist/Client.js",
-    "./Server.js": "./dist/Server.js"
+    "./Client.js": {
+      "default": "./dist/Client.js",
+      "types": "./dist/types.ts"
+    },
+    "./Server.js": {
+      "default": "./dist/Server.js",
+      "types": "./dist/types.ts"
+    }
   },
-  "types": "./dist/index.d.ts",
   "scripts": {
     "prebuild": "rimraf dist",
     "build": "tsc -p tsconfig.build.json",
