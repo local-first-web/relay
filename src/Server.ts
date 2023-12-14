@@ -98,7 +98,7 @@ export class Server extends EventEmitter<ServerEvents> {
 
         .listen(this.port, () => {
           if (!silent)
-            console.log(`🐟 ⯁ Listening at http://localhost:${this.port}`)
+            console.log(`🐟 Listening at http://localhost:${this.port}`)
           this.emit("ready")
           resolve()
         })
