@@ -8,11 +8,11 @@
   "type": "module",
   "private": false,
   "exports": {
-    "./Client.js": {
+    "./client": {
       "types": "./dist/types.ts",
       "default": "./dist/Client.js"
     },
-    "./Server.js": {
+    "./server": {
       "types": "./dist/types.ts",
       "default": "./dist/Server.js"
     }
