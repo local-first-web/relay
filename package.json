@@ -9,12 +9,12 @@
   "private": false,
   "exports": {
     "./Client.js": {
-      "default": "./dist/Client.js",
-      "types": "./dist/types.ts"
+      "types": "./dist/types.ts",
+      "default": "./dist/Client.js"
     },
     "./Server.js": {
-      "default": "./dist/Server.js",
-      "types": "./dist/types.ts"
+      "types": "./dist/types.ts",
+      "default": "./dist/Server.js"
     }
   },
   "engines": {
