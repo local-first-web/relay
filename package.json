@@ -8,13 +8,13 @@
   "type": "module",
   "private": false,
   "exports": {
-    "./Client.js": {
-      "default": "./dist/Client.js",
-      "types": "./dist/types.ts"
+    "./client": {
+      "types": "./dist/types.ts",
+      "default": "./dist/Client.js"
     },
-    "./Server.js": {
-      "default": "./dist/Server.js",
-      "types": "./dist/types.ts"
+    "./server": {
+      "types": "./dist/types.ts",
+      "default": "./dist/Server.js"
     }
   },
   "engines": {
