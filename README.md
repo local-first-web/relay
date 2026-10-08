@@ -1,6 +1,8 @@
 <img src='https://raw.githubusercontent.com/local-first-web/branding/main/svg/relay-h.svg'
 width='600' alt="@localfirst/relay logo"/>
 
+> **This project is no longer maintained.**
+
 `@localfirst/relay` is a tiny service that helps local-first applications connect with peers on
 other devices. It can run in the cloud or on any device with a known address.
 
